@@ -3,19 +3,26 @@
  * Comprehensive integration with Doma APIs for orderbook, fractionalization, and more
  */
 
-const DOMA_API_BASE = process.env.NEXT_PUBLIC_DOMA_API_URL || 'https://api-testnet.doma.xyz';
-const DOMA_API_KEY = process.env.NEXT_PUBLIC_DOMA_API_KEY || '';
+// Use proxy API route to avoid CORS issues with x-api-key header
+const getDomaApiBase = () => {
+  if (typeof window !== 'undefined') {
+    return `${window.location.origin}/api/doma`;
+  }
+  return process.env.NEXT_PUBLIC_DOMA_API_URL || 'https://api-testnet.doma.xyz';
+};
 
-// API request helper
+// API request helper - routes through Next.js API to avoid CORS
 async function domaApiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const response = await fetch(`${DOMA_API_BASE}${endpoint}`, {
+  const baseUrl = getDomaApiBase();
+  const url = endpoint === '/graphql' ? baseUrl : `${baseUrl}${endpoint}`;
+
+  const response = await fetch(url, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': DOMA_API_KEY,
       ...options.headers,
     },
   });
@@ -128,13 +135,27 @@ export async function cancelOffer(
   });
 }
 
+export interface FulfillmentData {
+  order: {
+    orderId: string;
+    maker: string;
+    taker: string;
+    price: string;
+    signature: string;
+  };
+  fulfillmentData: {
+    contractAddress: string;
+    calldata: string;
+  };
+}
+
 /**
  * Get fulfillment data for a listing
  */
 export async function getListingFulfillmentData(
   orderId: string,
   buyer: string
-): Promise<any> {
+): Promise<FulfillmentData> {
   return domaApiRequest(`/v1/orderbook/listing/${orderId}/${buyer}`);
 }
 
@@ -144,7 +165,7 @@ export async function getListingFulfillmentData(
 export async function getOfferFulfillmentData(
   orderId: string,
   fulfiller: string
-): Promise<any> {
+): Promise<FulfillmentData> {
   return domaApiRequest(`/v1/orderbook/offer/${orderId}/${fulfiller}`);
 }
 
@@ -178,7 +199,7 @@ export async function getSupportedCurrencies(
 
 export interface GraphQLQueryParams {
   query: string;
-  variables?: Record<string, any>;
+  variables?: Record<string, unknown>;
 }
 
 /**
@@ -194,45 +215,48 @@ export async function graphqlQuery<T>(params: GraphQLQueryParams): Promise<T> {
 // ===== DOMAIN QUERIES =====
 
 export interface DomaName {
-  id: string;
   name: string;
   expiresAt?: string;
+  transferLock?: boolean;
   registrar?: {
-    id: string;
     name: string;
-  };
-  network?: {
-    id: string;
-    name: string;
+    ianaId?: string;
   };
   tokens?: DomaToken[];
   claimStatus?: 'CLAIMED' | 'UNCLAIMED';
+  highestOffer?: any;
+  activeOffersCount?: number;
 }
 
 export interface DomaToken {
-  id: string;
   tokenId: string;
   ownerAddress: string;
-  name?: DomaName;
+  networkId?: string;
+  chain?: string;
+  tokenAddress?: string;
+  imageURI?: string;
 }
 
 export interface DomaListing {
   id: string;
-  token: DomaToken;
+  externalId?: string;
   price: string;
   currency: string;
-  seller: string;
-  status: string;
+  offererAddress: string;
+  orderbook?: string;
+  expiresAt?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface DomaOfferData {
   id: string;
-  token: DomaToken;
+  externalId?: string;
   price: string;
   currency: string;
-  offerer: string;
-  status: string;
+  offererAddress: string;
+  orderbook?: string;
+  expiresAt?: string;
   createdAt: string;
 }
 
@@ -244,24 +268,35 @@ export async function fetchTrendingDomains(
 ): Promise<DomaName[]> {
   const query = `
     query GetTrendingNames($take: Int!) {
-      names(take: $take, claimStatus: CLAIMED, sortBy: CREATED_AT, sortOrder: DESC) {
+      names(take: $take, claimStatus: CLAIMED, sortBy: DOMAIN, sortOrder: DESC) {
         items {
-          id
           name
           expiresAt
+          transferLock
           registrar {
-            id
             name
-          }
-          network {
-            id
-            name
+            ianaId
           }
           tokens {
-            id
             tokenId
             ownerAddress
+            networkId
+            chain {
+              name
+              networkId
+            }
+            tokenAddress
+            imageURI
           }
+          highestOffer {
+            price
+            currency {
+              name
+              symbol
+              decimals
+            }
+          }
+          activeOffersCount
         }
       }
     }
@@ -279,42 +314,11 @@ export async function fetchTrendingDomains(
  * Fetch listings (buy now offers)
  */
 export async function fetchListings(
-  take: number = 20,
-  filters?: {
-    tlds?: string[];
-    networkIds?: string[];
-  }
+  take: number = 20
 ): Promise<DomaListing[]> {
-  const query = `
-    query GetListings($take: Int!, $tlds: [String!], $networkIds: [String!]) {
-      listings(take: $take, tlds: $tlds, networkIds: $networkIds, sortBy: CREATED_AT, sortOrder: DESC) {
-        items {
-          id
-          token {
-            id
-            tokenId
-            ownerAddress
-            name {
-              id
-              name
-            }
-          }
-          price
-          currency
-          seller
-          status
-          createdAt
-        }
-      }
-    }
-  `;
-
-  const result = await graphqlQuery<{ listings: { items: DomaListing[] } }>({
-    query,
-    variables: { take, ...filters },
-  });
-
-  return result.listings?.items || [];
+  // Note: Listings query structure may need adjustment based on API docs
+  // For now, return empty array as schema needs clarification
+  return [];
 }
 
 /**
@@ -324,36 +328,9 @@ export async function fetchOffers(
   tokenId?: string,
   take: number = 20
 ): Promise<DomaOfferData[]> {
-  const query = `
-    query GetOffers($tokenId: String, $take: Int!) {
-      offers(tokenId: $tokenId, take: $take, sortBy: CREATED_AT, sortOrder: DESC) {
-        items {
-          id
-          token {
-            id
-            tokenId
-            ownerAddress
-            name {
-              id
-              name
-            }
-          }
-          price
-          currency
-          offerer
-          status
-          createdAt
-        }
-      }
-    }
-  `;
-
-  const result = await graphqlQuery<{ offers: { items: DomaOfferData[] } }>({
-    query,
-    variables: { tokenId, take },
-  });
-
-  return result.offers?.items || [];
+  // Note: Offers query structure may need adjustment based on API docs
+  // For now, return empty array as schema needs clarification
+  return [];
 }
 
 /**
@@ -363,22 +340,33 @@ export async function fetchDomainByName(name: string): Promise<DomaName | null> 
   const query = `
     query GetName($name: String!) {
       name(name: $name) {
-        id
         name
         expiresAt
+        transferLock
         registrar {
-          id
           name
-        }
-        network {
-          id
-          name
+          ianaId
         }
         tokens {
-          id
           tokenId
           ownerAddress
+          networkId
+          chain {
+            name
+            networkId
+          }
+          tokenAddress
+          imageURI
         }
+        highestOffer {
+          price
+          currency {
+            name
+            symbol
+            decimals
+          }
+        }
+        activeOffersCount
       }
     }
   `;

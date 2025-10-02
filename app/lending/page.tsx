@@ -25,11 +25,31 @@ const ERC721_ABI = [
     outputs: [],
   },
   {
+    name: 'setApprovalForAll',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'operator', type: 'address' },
+      { name: 'approved', type: 'bool' },
+    ],
+    outputs: [],
+  },
+  {
     name: 'getApproved',
     type: 'function',
     stateMutability: 'view',
     inputs: [{ name: 'tokenId', type: 'uint256' }],
     outputs: [{ name: '', type: 'address' }],
+  },
+  {
+    name: 'isApprovedForAll',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'owner', type: 'address' },
+      { name: 'operator', type: 'address' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
   },
 ] as const;
 
@@ -42,6 +62,7 @@ export default function LendingPage() {
   const [interestRate] = useState(8.5); // Fixed for demo
   const [domainValue, setDomainValue] = useState(0);
   const [approvalStep, setApprovalStep] = useState<'idle' | 'approving' | 'approved'>('idle');
+  const [hasClickedApprove, setHasClickedApprove] = useState(false);
   const [currentAction, setCurrentAction] = useState<'approve' | 'loan' | null>(null);
 
   const { data: hash, writeContract, isPending, reset } = useWriteContract();
@@ -55,6 +76,30 @@ export default function LendingPage() {
     args: selectedDomain?.tokenId ? [BigInt(selectedDomain.tokenId)] : undefined,
   });
 
+  // Check if operator has approval for all tokens - MUST check for the CURRENT lending contract
+  const { data: isApprovedForAll, refetch: refetchApprovalForAll } = useReadContract({
+    address: CONTRACT_ADDRESSES.DomaOwnershipToken as `0x${string}`,
+    abi: ERC721_ABI,
+    functionName: 'isApprovedForAll',
+    args: address ? [address as `0x${string}`, CONTRACT_ADDRESSES.DomainLending as `0x${string}`] : undefined,
+  });
+
+  // Check NFT owner to verify before creating loan
+  const { data: nftOwner, refetch: refetchOwnership } = useReadContract({
+    address: CONTRACT_ADDRESSES.DomaOwnershipToken as `0x${string}`,
+    abi: [
+      {
+        name: 'ownerOf',
+        type: 'function',
+        stateMutability: 'view',
+        inputs: [{ name: 'tokenId', type: 'uint256' }],
+        outputs: [{ name: '', type: 'address' }],
+      },
+    ] as const,
+    functionName: 'ownerOf',
+    args: selectedDomain?.tokenId ? [BigInt(selectedDomain.tokenId)] : undefined,
+  });
+
   useEffect(() => {
     const storedDomain = sessionStorage.getItem('selectedDomain');
     if (storedDomain) {
@@ -62,6 +107,10 @@ export default function LendingPage() {
       setSelectedDomain(domain);
       setDomainValue(estimateDomainValue(domain));
     }
+
+    // Debug: Log contract addresses
+    console.log('Lending Contract Address:', CONTRACT_ADDRESSES.DomainLending);
+    console.log('NFT Contract Address:', CONTRACT_ADDRESSES.DomaOwnershipToken);
   }, []);
 
   // Handle transaction success
@@ -97,17 +146,39 @@ export default function LendingPage() {
     }
   }, [isError, error, currentAction]);
 
+  // Check if already approved - FORCE RESET to idle on mount
+  useEffect(() => {
+    // Reset approval state when component mounts or contract changes
+    setApprovalStep('idle');
+  }, []);
+
   // Check if already approved
   useEffect(() => {
-    if (approvedAddress && approvedAddress.toLowerCase() === CONTRACT_ADDRESSES.DomainLending.toLowerCase()) {
+    const hasTokenApproval = approvedAddress && approvedAddress.toLowerCase() === CONTRACT_ADDRESSES.DomainLending.toLowerCase();
+    const hasOperatorApproval = isApprovedForAll === true;
+
+    console.log('Approval check:', {
+      approvedAddress,
+      isApprovedForAll,
+      hasTokenApproval,
+      hasOperatorApproval,
+      expectedContract: CONTRACT_ADDRESSES.DomainLending,
+      currentApprovalStep: approvalStep,
+      userAddress: address,
+      checkingApprovalFor: `${address} -> ${CONTRACT_ADDRESSES.DomainLending}`,
+    });
+
+    if (hasTokenApproval || hasOperatorApproval) {
+      console.log('Setting approval to approved');
       setApprovalStep('approved');
-    } else if (approvalStep === 'approved' && approvedAddress?.toLowerCase() !== CONTRACT_ADDRESSES.DomainLending.toLowerCase()) {
+    } else if (approvalStep === 'approved' && !hasTokenApproval && !hasOperatorApproval) {
       // Only reset if we're not in the middle of a transaction
       if (!isPending && !isConfirming) {
+        console.log('Resetting approval to idle');
         setApprovalStep('idle');
       }
     }
-  }, [approvedAddress, isPending, isConfirming, approvalStep]);
+  }, [approvedAddress, isApprovedForAll, isPending, isConfirming, approvalStep]);
 
   const calculateInterest = () => {
     const amount = parseFloat(loanAmount) || 0;
@@ -127,14 +198,18 @@ export default function LendingPage() {
     try {
       setApprovalStep('approving');
       setCurrentAction('approve');
+      setHasClickedApprove(true);
 
-      const toastId = toast.loading('Approving NFT...');
+      const toastId = toast.loading(`Approving lending contract: ${CONTRACT_ADDRESSES.DomainLending.slice(0, 6)}...${CONTRACT_ADDRESSES.DomainLending.slice(-4)}`);
 
+      console.log('Approving contract:', CONTRACT_ADDRESSES.DomainLending);
+
+      // Use setApprovalForAll instead of approve for better compatibility
       writeContract({
         address: CONTRACT_ADDRESSES.DomaOwnershipToken as `0x${string}`,
         abi: ERC721_ABI,
-        functionName: 'approve',
-        args: [CONTRACT_ADDRESSES.DomainLending as `0x${string}`, BigInt(selectedDomain.tokenId || '0')],
+        functionName: 'setApprovalForAll',
+        args: [CONTRACT_ADDRESSES.DomainLending as `0x${string}`, true],
       });
 
       // Dismiss loading toast after write is initiated
@@ -153,9 +228,51 @@ export default function LendingPage() {
       return;
     }
 
-    // Check if NFT is approved first
-    if (approvalStep !== 'approved') {
-      toast.error('Please approve the NFT first');
+    // Check for transfer lock
+    if (selectedDomain.transferLock) {
+      toast.error('This domain has a transfer lock enabled. Please disable it first at doma.xyz before using as collateral.');
+      console.error('Transfer lock enabled:', {
+        domain: selectedDomain.name,
+        tokenId: selectedDomain.tokenId,
+      });
+      return;
+    }
+
+    // Refetch ownership and approval to ensure current state
+    const [ownerResult, approvalResult, approvalForAllResult] = await Promise.all([
+      refetchOwnership(),
+      refetchApproval(),
+      refetchApprovalForAll(),
+    ]);
+
+    const currentOwner = ownerResult.data;
+    const currentApproval = approvalResult.data;
+    const currentApprovalForAll = approvalForAllResult.data;
+
+    // Verify ownership before proceeding
+    if (!currentOwner || currentOwner.toLowerCase() !== address.toLowerCase()) {
+      toast.error(`NFT is not owned by your wallet. Owner: ${currentOwner ? currentOwner.slice(0, 6) + '...' + currentOwner.slice(-4) : 'unknown'}`);
+      console.error('Ownership mismatch:', {
+        currentOwner,
+        connectedAddress: address,
+        tokenId: selectedDomain.tokenId,
+      });
+      return;
+    }
+
+    // Check if NFT is approved (either specific token approval or operator approval)
+    const hasTokenApproval = currentApproval && currentApproval.toLowerCase() === CONTRACT_ADDRESSES.DomainLending.toLowerCase();
+    const hasOperatorApproval = currentApprovalForAll === true;
+
+    if (!hasTokenApproval && !hasOperatorApproval) {
+      toast.error('NFT approval not found. Please approve the NFT first.');
+      console.error('Approval check failed:', {
+        currentApproval,
+        currentApprovalForAll,
+        expectedApproval: CONTRACT_ADDRESSES.DomainLending,
+        tokenId: selectedDomain.tokenId,
+      });
+      setApprovalStep('idle');
       return;
     }
 
@@ -186,6 +303,18 @@ export default function LendingPage() {
       const domainValueWei = parseUnits(domainValue.toString(), 6);
       const durationSeconds = BigInt(durationDays * 24 * 60 * 60);
       const interestRateBps = BigInt(Math.floor(interestRate * 100)); // Convert to basis points
+
+      console.log('Creating loan with params:', {
+        domainNFT: CONTRACT_ADDRESSES.DomaOwnershipToken,
+        tokenId: selectedDomain.tokenId,
+        loanAmount: amount,
+        interestRate: interestRate,
+        duration: durationDays,
+        collateralValue: domainValue,
+        nftOwner,
+        connectedAddress: address,
+        approvedAddress,
+      });
 
       writeContract({
         address: CONTRACT_ADDRESSES.DomainLending as `0x${string}`,
@@ -231,11 +360,14 @@ export default function LendingPage() {
 
               <div className="space-y-4">
                 {selectedDomain ? (
-                  <div className="bg-[var(--background)] border border-[var(--border)] rounded-lg p-4">
+                  <div className={`border rounded-lg p-4 ${selectedDomain.transferLock ? 'bg-red-500/10 border-red-500/20' : 'bg-[var(--background)] border-[var(--border)]'}`}>
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm text-gray-400">Selected Domain</p>
                         <p className="text-lg font-semibold">{selectedDomain.name}</p>
+                        {selectedDomain.transferLock && (
+                          <p className="text-xs text-red-400 mt-1">⚠️ Transfer locked - cannot be used as collateral</p>
+                        )}
                       </div>
                       <button
                         onClick={() => router.push('/dashboard')}
@@ -304,14 +436,21 @@ export default function LendingPage() {
                   </div>
                 </div>
 
-                {approvalStep !== 'approved' ? (
-                  <button
-                    onClick={handleApproveNFT}
-                    disabled={isPending || isConfirming || !selectedDomain}
-                    className="w-full bg-gradient-to-r from-blue-600 to-blue-500 text-white py-3 rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {approvalStep === 'approving' ? 'Approving NFT...' : 'Step 1: Approve NFT'}
-                  </button>
+                {approvalStep !== 'approved' || (approvedAddress && approvedAddress.toLowerCase() !== CONTRACT_ADDRESSES.DomainLending.toLowerCase() && !isApprovedForAll) ? (
+                  <>
+                    {approvedAddress && approvedAddress.toLowerCase() !== CONTRACT_ADDRESSES.DomainLending.toLowerCase() && !isApprovedForAll && (
+                      <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 text-sm text-yellow-500">
+                        ⚠️ Approval detected for old contract. Please approve the new contract.
+                      </div>
+                    )}
+                    <button
+                      onClick={handleApproveNFT}
+                      disabled={isPending || isConfirming || !selectedDomain}
+                      className="w-full bg-gradient-to-r from-blue-600 to-blue-500 text-white py-3 rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {approvalStep === 'approving' ? 'Approving NFT...' : 'Step 1: Approve NFT'}
+                    </button>
+                  </>
                 ) : (
                   <div className="space-y-2">
                     <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 text-sm text-green-500 flex items-center gap-2">

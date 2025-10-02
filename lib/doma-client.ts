@@ -25,6 +25,7 @@ export interface DomainToken {
   owner: string;
   expirationDate?: number;
   registrar?: string;
+  transferLock?: boolean;
   chain: {
     id: string;
     name: string;

@@ -1,0 +1,241 @@
+import { GraphQLClient } from 'graphql-request';
+
+/**
+ * Doma Protocol Client
+ * Integrates with Doma's subgraph and APIs for domain management
+ */
+
+export const DOMA_SUBGRAPH_URL = process.env.NEXT_PUBLIC_DOMA_SUBGRAPH_URL ||
+  'https://api-testnet.doma.xyz/graphql';
+
+export const domaClient = new GraphQLClient(DOMA_SUBGRAPH_URL);
+
+export interface DomainToken {
+  id: string;
+  name: string;
+  owner: string;
+  expirationDate?: number;
+  registrar?: string;
+  chain: {
+    id: string;
+    name: string;
+  };
+  tokenAddress?: string;
+  tokenId?: string;
+}
+
+export interface TokenData {
+  id: string;
+  tokenId: string;
+  owner: string;
+  name: {
+    id: string;
+    name: string;
+    expirationDate?: number;
+    registrar?: {
+      id: string;
+      name: string;
+    };
+    chain?: {
+      id: string;
+      name: string;
+    };
+  };
+  chain: {
+    id: string;
+    name: string;
+  };
+}
+
+export interface DomainMetadata {
+  name: string;
+  description: string;
+  image: string;
+  attributes: {
+    trait_type: string;
+    value: string;
+  }[];
+}
+
+/**
+ * Fetch domain tokens owned by an address
+ */
+export async function fetchDomainsByOwner(owner: string): Promise<DomainToken[]> {
+  const query = `
+    query GetTokens($owner: String!) {
+      tokens(owner: $owner, limit: 100) {
+        id
+        tokenId
+        owner
+        name {
+          id
+          name
+          expirationDate
+          registrar {
+            id
+            name
+          }
+        }
+        chain {
+          id
+          name
+        }
+      }
+    }
+  `;
+
+  try {
+    const data = await domaClient.request<{ tokens: TokenData[] }>(query, { owner: owner.toLowerCase() });
+
+    // Transform to DomainToken format
+    const domains: DomainToken[] = (data.tokens || []).map(token => ({
+      id: token.id,
+      name: token.name.name,
+      owner: token.owner,
+      expirationDate: 0, // Will be updated from name data if available
+      registrar: token.name.name, // Placeholder
+      chain: token.chain,
+      tokenAddress: token.id.split('-')[0],
+      tokenId: token.tokenId,
+    }));
+
+    return domains;
+  } catch (error) {
+    console.error('Error fetching domains:', error);
+    return [];
+  }
+}
+
+/**
+ * Fetch a specific domain by token ID
+ */
+export async function fetchDomainByTokenId(tokenId: string): Promise<DomainToken | null> {
+  const query = `
+    query GetToken($tokenId: String!) {
+      token(id: $tokenId) {
+        id
+        tokenId
+        owner
+        name {
+          id
+          name
+          expirationDate
+          registrar {
+            id
+            name
+          }
+        }
+        chain {
+          id
+          name
+        }
+      }
+    }
+  `;
+
+  try {
+    const data = await domaClient.request<{ token: TokenData | null }>(query, { tokenId });
+
+    if (!data.token) return null;
+
+    return {
+      id: data.token.id,
+      name: data.token.name.name,
+      owner: data.token.owner,
+      expirationDate: 0,
+      registrar: data.token.name.name,
+      chain: data.token.name.chain || { id: '', name: '' },
+      tokenAddress: data.token.id.split('-')[0],
+      tokenId: data.token.tokenId,
+    };
+  } catch (error) {
+    console.error('Error fetching domain:', error);
+    return null;
+  }
+}
+
+export interface FractionalToken {
+  id: string;
+  name: {
+    id: string;
+    name: string;
+  };
+  tokenAddress: string;
+  totalSupply: string;
+  buyoutPrice: string;
+}
+
+/**
+ * Fetch fractional tokens for a domain (Doma's equivalent of synthetic tokens)
+ */
+export async function fetchFractionalTokens(nameId: string): Promise<FractionalToken[]> {
+  const query = `
+    query GetFractionalTokens($nameId: String!) {
+      fractionalTokens(nameId: $nameId) {
+        id
+        name {
+          id
+          name
+        }
+        tokenAddress
+        totalSupply
+        buyoutPrice
+      }
+    }
+  `;
+
+  try {
+    const data = await domaClient.request<{ fractionalTokens: FractionalToken[] }>(query, { nameId });
+    return data.fractionalTokens || [];
+  } catch (error) {
+    console.error('Error fetching fractional tokens:', error);
+    return [];
+  }
+}
+
+/**
+ * Check if a domain is expired
+ */
+export function isDomainExpired(expirationDate: number): boolean {
+  return Date.now() / 1000 > expirationDate;
+}
+
+/**
+ * Format domain expiration date
+ */
+export function formatExpirationDate(timestamp: number): string {
+  return new Date(timestamp * 1000).toLocaleDateString();
+}
+
+/**
+ * Calculate days until expiration
+ */
+export function daysUntilExpiration(expirationDate: number): number {
+  const now = Date.now() / 1000;
+  const secondsRemaining = expirationDate - now;
+  return Math.ceil(secondsRemaining / 86400);
+}
+
+/**
+ * Estimate domain value based on characteristics
+ * This is a simplified estimation - production would use oracles or market data
+ */
+export function estimateDomainValue(domain: DomainToken): number {
+  const baseValue = 100; // Base value in USD
+  let multiplier = 1;
+
+  const domainName = domain.name.toLowerCase();
+
+  // Shorter domains are more valuable
+  if (domainName.length <= 4) multiplier *= 10;
+  else if (domainName.length <= 6) multiplier *= 5;
+  else if (domainName.length <= 8) multiplier *= 2;
+
+  // Premium TLDs
+  if (domainName.endsWith('.com')) multiplier *= 3;
+  else if (domainName.endsWith('.org')) multiplier *= 2;
+  else if (domainName.endsWith('.io')) multiplier *= 2.5;
+  else if (domainName.endsWith('.eth')) multiplier *= 4;
+
+  return Math.floor(baseValue * multiplier);
+}

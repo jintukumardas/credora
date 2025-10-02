@@ -215,6 +215,7 @@ export async function graphqlQuery<T>(params: GraphQLQueryParams): Promise<T> {
 // ===== DOMAIN QUERIES =====
 
 export interface DomaName {
+  id?: string;
   name: string;
   expiresAt?: string;
   transferLock?: boolean;
@@ -224,8 +225,12 @@ export interface DomaName {
   };
   tokens?: DomaToken[];
   claimStatus?: 'CLAIMED' | 'UNCLAIMED';
-  highestOffer?: any;
+  highestOffer?: {
+    amount?: number;
+    currency?: string;
+  };
   activeOffersCount?: number;
+  network?: string;
 }
 
 export interface DomaToken {
@@ -247,6 +252,14 @@ export interface DomaListing {
   expiresAt?: string;
   createdAt: string;
   updatedAt?: string;
+  token?: {
+    tokenId?: string;
+    name?: {
+      name?: string;
+    };
+  };
+  seller?: string;
+  status?: string;
 }
 
 export interface DomaOfferData {
@@ -314,7 +327,7 @@ export async function fetchTrendingDomains(
  * Fetch listings (buy now offers)
  */
 export async function fetchListings(
-  take: number = 20
+  _take: number = 20
 ): Promise<DomaListing[]> {
   // Note: Listings query structure may need adjustment based on API docs
   // For now, return empty array as schema needs clarification
@@ -325,8 +338,8 @@ export async function fetchListings(
  * Fetch offers for domains
  */
 export async function fetchOffers(
-  tokenId?: string,
-  take: number = 20
+  _tokenId?: string,
+  _take: number = 20
 ): Promise<DomaOfferData[]> {
   // Note: Offers query structure may need adjustment based on API docs
   // For now, return empty array as schema needs clarification

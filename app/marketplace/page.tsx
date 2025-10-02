@@ -39,7 +39,7 @@ export default function MarketplacePage() {
   );
 
   const filteredListings = listings.filter((listing) =>
-    listing.token?.name?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+    listing.id?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -164,7 +164,7 @@ function DomainCard({ domain }: { domain: DomaName }) {
         <div className="flex-1">
           <h3 className="text-xl font-bold mb-1 truncate">{domain.name}</h3>
           <p className="text-sm text-gray-400">
-            {domain.network?.name || 'Unknown Network'}
+            {domain.network || 'Unknown Network'}
           </p>
         </div>
         {isExpiringSoon && (
@@ -223,11 +223,11 @@ function ListingCard({ listing }: { listing: DomaListing }) {
         <div className="flex-1">
           <h3 className="text-xl font-bold mb-1 truncate">{domainName}</h3>
           <p className="text-sm text-gray-400">
-            Listed by {listing.seller.slice(0, 6)}...{listing.seller.slice(-4)}
+            Listed by {listing.seller?.slice(0, 6) || listing.offererAddress.slice(0, 6)}...{listing.seller?.slice(-4) || listing.offererAddress.slice(-4)}
           </p>
         </div>
         <span className="bg-green-500/10 text-green-500 text-xs px-2 py-1 rounded">
-          {listing.status}
+          {listing.status || 'Active'}
         </span>
       </div>
 

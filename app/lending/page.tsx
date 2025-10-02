@@ -62,7 +62,6 @@ export default function LendingPage() {
   const [interestRate] = useState(8.5); // Fixed for demo
   const [domainValue, setDomainValue] = useState(0);
   const [approvalStep, setApprovalStep] = useState<'idle' | 'approving' | 'approved'>('idle');
-  const [hasClickedApprove, setHasClickedApprove] = useState(false);
   const [currentAction, setCurrentAction] = useState<'approve' | 'loan' | null>(null);
 
   const { data: hash, writeContract, isPending, reset } = useWriteContract();
@@ -178,7 +177,7 @@ export default function LendingPage() {
         setApprovalStep('idle');
       }
     }
-  }, [approvedAddress, isApprovedForAll, isPending, isConfirming, approvalStep]);
+  }, [approvedAddress, isApprovedForAll, isPending, isConfirming, approvalStep, address]);
 
   const calculateInterest = () => {
     const amount = parseFloat(loanAmount) || 0;
@@ -198,7 +197,6 @@ export default function LendingPage() {
     try {
       setApprovalStep('approving');
       setCurrentAction('approve');
-      setHasClickedApprove(true);
 
       const toastId = toast.loading(`Approving lending contract: ${CONTRACT_ADDRESSES.DomainLending.slice(0, 6)}...${CONTRACT_ADDRESSES.DomainLending.slice(-4)}`);
 

@@ -1,7 +1,18 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
+require("dotenv").config({ path: ".env.local" });
 
 const config: HardhatUserConfig = {
+  paths: {
+    sources: "./contracts",
+    tests: "./test",
+    cache: "./cache",
+    artifacts: "./artifacts",
+  },
+  typechain: {
+    outDir: "typechain-types",
+    target: "ethers-v6",
+  },
   solidity: {
     version: "0.8.24",
     settings: {

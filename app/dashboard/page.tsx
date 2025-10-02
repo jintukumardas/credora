@@ -9,8 +9,10 @@ import { useEffect, useState } from 'react';
 import { fetchDomainsByOwner, DomainToken } from '@/lib/doma-client';
 import { Wallet, TrendingUp, Globe, DollarSign } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function Dashboard() {
+  const router = useRouter();
   const { address, isConnected } = useAccount();
   const [domains, setDomains] = useState<DomainToken[]>([]);
   const [loading, setLoading] = useState(false);
@@ -23,6 +25,16 @@ export default function Dashboard() {
         .finally(() => setLoading(false));
     }
   }, [address]);
+
+  const handleBorrow = (domain: DomainToken) => {
+    sessionStorage.setItem('selectedDomain', JSON.stringify(domain));
+    router.push('/lending');
+  };
+
+  const handleLease = (domain: DomainToken) => {
+    sessionStorage.setItem('selectedDomain', JSON.stringify(domain));
+    router.push('/leasing');
+  };
 
   const totalValue = domains.reduce((sum) => sum + 1000, 0); // Simplified
   const activeLoans = 0;
@@ -153,8 +165,8 @@ export default function Dashboard() {
                     <DomainCard
                       key={domain.id}
                       domain={domain}
-                      onBorrow={() => console.log('Borrow', domain)}
-                      onLease={() => console.log('Lease', domain)}
+                      onBorrow={() => handleBorrow(domain)}
+                      onLease={() => handleLease(domain)}
                     />
                   ))}
                 </div>

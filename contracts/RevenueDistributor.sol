@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title RevenueDistributor
@@ -230,7 +230,13 @@ contract RevenueDistributor is ReentrancyGuard {
     /**
      * @notice Get stream details
      * @param streamId ID of the stream
-     * @return Stream data
+     * @return domainNFT Address of the domain NFT
+     * @return tokenId Token ID of the domain
+     * @return beneficiaries Array of beneficiary addresses
+     * @return shares Array of share percentages
+     * @return totalCollected Total revenue collected
+     * @return totalDistributed Total revenue distributed
+     * @return active Whether the stream is active
      */
     function getStream(
         uint256 streamId

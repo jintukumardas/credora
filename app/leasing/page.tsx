@@ -2,8 +2,10 @@
 
 import { Header } from '@/components/Header';
 import { motion } from 'framer-motion';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Globe, DollarSign, Clock, Shield } from 'lucide-react';
+import { DomainToken } from '@/lib/doma-client';
+import { useRouter } from 'next/navigation';
 
 const PERMISSION_TYPES = [
   { id: 'dns', name: 'DNS Control', description: 'Full DNS record management', icon: Globe },
@@ -13,9 +15,18 @@ const PERMISSION_TYPES = [
 ];
 
 export default function LeasingPage() {
+  const router = useRouter();
+  const [selectedDomain, setSelectedDomain] = useState<DomainToken | null>(null);
   const [selectedPermission, setSelectedPermission] = useState('dns');
   const [rentalPrice, setRentalPrice] = useState('');
   const [duration, setDuration] = useState('30');
+
+  useEffect(() => {
+    const storedDomain = sessionStorage.getItem('selectedDomain');
+    if (storedDomain) {
+      setSelectedDomain(JSON.parse(storedDomain));
+    }
+  }, []);
 
   return (
     <>
@@ -37,14 +48,34 @@ export default function LeasingPage() {
               <h2 className="text-xl font-bold mb-6">Create Lease</h2>
 
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">Select Domain</label>
-                  <select className="w-full bg-[var(--background)] border border-[var(--border)] rounded-lg px-4 py-3 text-white">
-                    <option>example.com</option>
-                    <option>mydomain.io</option>
-                    <option>premium.eth</option>
-                  </select>
-                </div>
+                {selectedDomain ? (
+                  <div className="bg-[var(--background)] border border-[var(--border)] rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-400">Selected Domain</p>
+                        <p className="text-lg font-semibold">{selectedDomain.name}</p>
+                      </div>
+                      <button
+                        onClick={() => router.push('/dashboard')}
+                        className="text-sm text-[var(--primary)] hover:underline"
+                      >
+                        Change
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
+                    <p className="text-yellow-500 text-sm">
+                      No domain selected.{' '}
+                      <button
+                        onClick={() => router.push('/dashboard')}
+                        className="underline hover:no-underline"
+                      >
+                        Go to dashboard
+                      </button>
+                    </p>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm text-gray-400 mb-2">Permission Type</label>

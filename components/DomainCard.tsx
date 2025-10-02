@@ -27,12 +27,13 @@ export function DomainCard({ domain, onBorrow, onLease }: DomainCardProps) {
           </div>
           <div>
             <h3 className="text-lg font-semibold text-white">{domain.name}</h3>
-            <p className="text-sm text-gray-400">Token #{domain.tokenId || 'N/A'}</p>
+            <p className="text-sm text-gray-400">Token</p>
           </div>
         </div>
-        <span className="px-2 py-1 bg-blue-500/20 text-blue-400 text-xs rounded-full">
-          {domain.chain.name}
-        </span>
+      </div>
+
+      <div className="text-xs text-gray-500 mb-4 font-mono break-all">
+        #{domain.tokenId || 'N/A'}
       </div>
 
       <div className="space-y-3 mb-4">
@@ -72,7 +73,13 @@ export function DomainCard({ domain, onBorrow, onLease }: DomainCardProps) {
         <div className="flex items-center justify-between text-sm">
           <span className="text-gray-400">Owner</span>
           <span className="text-white font-mono text-xs">
-            {domain.owner.slice(0, 6)}...{domain.owner.slice(-4)}
+            {(() => {
+              // Extract address from CAIP-10 format (eip155:1:0x...) or use as-is
+              const addr = domain.owner.includes(':')
+                ? domain.owner.split(':').pop() || domain.owner
+                : domain.owner;
+              return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+            })()}
           </span>
         </div>
       </div>

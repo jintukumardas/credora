@@ -7,14 +7,7 @@ export async function POST(request: NextRequest) {
   try {
     const { query, variables } = await request.json();
 
-    console.log('Proxying request to Doma API:', {
-      url: DOMA_SUBGRAPH_URL,
-      hasApiKey: !!DOMA_API_KEY,
-      apiKeyPrefix: DOMA_API_KEY ? DOMA_API_KEY.substring(0, 10) + '...' : 'none'
-    });
-
     if (!DOMA_API_KEY) {
-      console.error('DOMA_API_KEY is not configured');
       return NextResponse.json(
         { error: 'API key not configured' },
         { status: 500 }
@@ -32,10 +25,7 @@ export async function POST(request: NextRequest) {
 
     const data = await response.json();
 
-    console.log('Doma API response:', { status: response.status, data });
-
     if (!response.ok) {
-      console.error('Doma API error:', data);
       return NextResponse.json(
         { error: data.message || 'Failed to fetch from Doma API', details: data },
         { status: response.status }

@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "TS_NODE_PROJECT=tsconfig.hardhat.json hardhat test",
+    "test:lending": "TS_NODE_PROJECT=tsconfig.hardhat.json hardhat test test/DomainLending.test.ts",
+    "hardhat:node": "TS_NODE_PROJECT=tsconfig.hardhat.json hardhat node",
+    "hardhat:compile": "TS_NODE_PROJECT=tsconfig.hardhat.json hardhat compile"
   },
   "dependencies": {
     "@rainbow-me/rainbowkit": "^2.2.8",
@@ -19,6 +23,7 @@
     "next": "15.5.4",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "react-hot-toast": "^2.6.0",
     "viem": "^2.37.11",
     "wagmi": "^2.17.5"
   },

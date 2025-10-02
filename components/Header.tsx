@@ -28,6 +28,12 @@ export function Header() {
 
           <nav className="hidden md:flex items-center gap-6">
             <Link
+              href="/marketplace"
+              className="text-gray-300 hover:text-white transition-colors"
+            >
+              Marketplace
+            </Link>
+            <Link
               href="/dashboard"
               className="text-gray-300 hover:text-white transition-colors"
             >

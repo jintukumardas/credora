@@ -5,16 +5,19 @@ import { GraphQLClient } from 'graphql-request';
  * Integrates with Doma's subgraph and APIs for domain management
  */
 
-export const DOMA_SUBGRAPH_URL = process.env.NEXT_PUBLIC_DOMA_SUBGRAPH_URL ||
-  'https://api-testnet.doma.xyz/graphql';
+// Use the Next.js API route to avoid CORS issues with x-api-key header
+const getDomaUrl = () => {
+  if (typeof window !== 'undefined') {
+    return `${window.location.origin}/api/doma`;
+  }
+  return process.env.NEXT_PUBLIC_DOMA_SUBGRAPH_URL || 'https://api-testnet.doma.xyz/graphql';
+};
+
+export const DOMA_SUBGRAPH_URL = getDomaUrl();
 
 export const DOMA_API_KEY = process.env.NEXT_PUBLIC_DOMA_API_KEY || '';
 
-export const domaClient = new GraphQLClient(DOMA_SUBGRAPH_URL, {
-  headers: DOMA_API_KEY ? {
-    'x-api-key': DOMA_API_KEY,
-  } : {},
-});
+export const domaClient = new GraphQLClient(DOMA_SUBGRAPH_URL);
 
 export interface DomainToken {
   id: string;
@@ -67,25 +70,24 @@ export interface DomainMetadata {
  * Fetch domain tokens owned by an address
  * Note: Doma API requires an API key - set NEXT_PUBLIC_DOMA_API_KEY in .env
  */
-export async function fetchDomainsByOwner(owner: string): Promise<DomainToken[]> {
+export async function fetchDomainsByOwner(owner: string, chainId: number = 1): Promise<DomainToken[]> {
   if (!DOMA_API_KEY) {
     console.warn('DOMA_API_KEY not configured - skipping domain fetch');
     return [];
   }
 
   const query = `
-    query GetNames($owner: String!) {
-      names(owner: $owner) {
+    query GetNames($ownedBy: [AddressCAIP10!]!) {
+      names(ownedBy: $ownedBy, take: 100, claimStatus: CLAIMED) {
         items {
           name
+          expiresAt
           tokens {
             tokenId
-            chain {
-              id
-              name
-            }
+            ownerAddress
           }
         }
+        totalCount
       }
     }
   `;
@@ -93,21 +95,29 @@ export async function fetchDomainsByOwner(owner: string): Promise<DomainToken[]>
   try {
     interface NameItem {
       name: string;
+      expiresAt?: string;
       tokens?: Array<{
         tokenId: string;
-        chain: { id: string; name: string };
+        ownerAddress: string;
       }>;
     }
 
-    const data = await domaClient.request<{ names: { items: NameItem[] } }>(query, { owner: owner.toLowerCase() });
+    // Convert address to CAIP-10 format: eip155:<chainId>:<address>
+    const caip10Address = `eip155:${chainId}:${owner.toLowerCase()}`;
+
+    const data = await domaClient.request<{ names: { items: NameItem[]; totalCount: number } }>(
+      query,
+      { ownedBy: [caip10Address] }
+    );
 
     // Transform to DomainToken format
     const domains: DomainToken[] = (data.names?.items || []).flatMap(item =>
       (item.tokens || []).map(token => ({
-        id: `${token.chain.id}-${token.tokenId}`,
+        id: token.tokenId,
         name: item.name,
-        owner: owner,
-        chain: token.chain,
+        owner: token.ownerAddress,
+        expirationDate: item.expiresAt ? new Date(item.expiresAt).getTime() / 1000 : undefined,
+        chain: { id: chainId.toString(), name: '' },
         tokenId: token.tokenId,
       }))
     );

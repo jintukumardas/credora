@@ -8,7 +8,13 @@ import { GraphQLClient } from 'graphql-request';
 export const DOMA_SUBGRAPH_URL = process.env.NEXT_PUBLIC_DOMA_SUBGRAPH_URL ||
   'https://api-testnet.doma.xyz/graphql';
 
-export const domaClient = new GraphQLClient(DOMA_SUBGRAPH_URL);
+export const DOMA_API_KEY = process.env.NEXT_PUBLIC_DOMA_API_KEY || '';
+
+export const domaClient = new GraphQLClient(DOMA_SUBGRAPH_URL, {
+  headers: DOMA_API_KEY ? {
+    'x-api-key': DOMA_API_KEY,
+  } : {},
+});
 
 export interface DomainToken {
   id: string;
@@ -59,45 +65,52 @@ export interface DomainMetadata {
 
 /**
  * Fetch domain tokens owned by an address
+ * Note: Doma API requires an API key - set NEXT_PUBLIC_DOMA_API_KEY in .env
  */
 export async function fetchDomainsByOwner(owner: string): Promise<DomainToken[]> {
+  if (!DOMA_API_KEY) {
+    console.warn('DOMA_API_KEY not configured - skipping domain fetch');
+    return [];
+  }
+
   const query = `
-    query GetTokens($owner: String!) {
-      tokens(owner: $owner, limit: 100) {
-        id
-        tokenId
-        owner
-        name {
-          id
+    query GetNames($owner: String!) {
+      names(owner: $owner) {
+        items {
           name
-          expirationDate
-          registrar {
-            id
-            name
+          tokens {
+            tokenId
+            chain {
+              id
+              name
+            }
           }
-        }
-        chain {
-          id
-          name
         }
       }
     }
   `;
 
   try {
-    const data = await domaClient.request<{ tokens: TokenData[] }>(query, { owner: owner.toLowerCase() });
+    interface NameItem {
+      name: string;
+      tokens?: Array<{
+        tokenId: string;
+        chain: { id: string; name: string };
+      }>;
+    }
+
+    const data = await domaClient.request<{ names: { items: NameItem[] } }>(query, { owner: owner.toLowerCase() });
 
     // Transform to DomainToken format
-    const domains: DomainToken[] = (data.tokens || []).map(token => ({
-      id: token.id,
-      name: token.name.name,
-      owner: token.owner,
-      expirationDate: 0, // Will be updated from name data if available
-      registrar: token.name.name, // Placeholder
-      chain: token.chain,
-      tokenAddress: token.id.split('-')[0],
-      tokenId: token.tokenId,
-    }));
+    const domains: DomainToken[] = (data.names?.items || []).flatMap(item =>
+      (item.tokens || []).map(token => ({
+        id: `${token.chain.id}-${token.tokenId}`,
+        name: item.name,
+        owner: owner,
+        chain: token.chain,
+        tokenId: token.tokenId,
+      }))
+    );
 
     return domains;
   } catch (error) {

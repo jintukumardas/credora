@@ -51,6 +51,7 @@ cp .env.example .env
 2. Add your configuration to `.env`:
 ```
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id
+NEXT_PUBLIC_DOMA_API_KEY=your_doma_api_key
 NEXT_PUBLIC_DOMA_SUBGRAPH_URL=https://api-testnet.doma.xyz/graphql
 NEXT_PUBLIC_DOMA_RPC_URL=https://rpc-testnet.doma.xyz
 ```

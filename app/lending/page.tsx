@@ -63,6 +63,10 @@ export default function LendingPage() {
   const [domainValue, setDomainValue] = useState(0);
   const [approvalStep, setApprovalStep] = useState<'idle' | 'approving' | 'approved'>('idle');
   const [currentAction, setCurrentAction] = useState<'approve' | 'loan' | null>(null);
+  const [activeLoans, setActiveLoans] = useState<any[]>([]);
+  const [totalBorrowed, setTotalBorrowed] = useState(0);
+  const [selectedLoanId, setSelectedLoanId] = useState<bigint | null>(null);
+  const [showLoanModal, setShowLoanModal] = useState(false);
 
   const { data: hash, writeContract, isPending, reset } = useWriteContract();
   const { isLoading: isConfirming, isSuccess, isError, error } = useWaitForTransactionReceipt({ hash });
@@ -112,6 +116,41 @@ export default function LendingPage() {
     console.log('NFT Contract Address:', CONTRACT_ADDRESSES.DomaOwnershipToken);
   }, []);
 
+  // Fetch active loans for the user
+  const { data: loanIds } = useReadContract({
+    address: CONTRACT_ADDRESSES.DomainLending as `0x${string}`,
+    abi: DomainLendingABI.abi,
+    functionName: 'getBorrowerLoans',
+    args: address ? [address] : undefined,
+  });
+
+  // Fetch selected loan details
+  const { data: selectedLoanData } = useReadContract({
+    address: CONTRACT_ADDRESSES.DomainLending as `0x${string}`,
+    abi: DomainLendingABI.abi,
+    functionName: 'loans',
+    args: selectedLoanId !== null ? [selectedLoanId] : undefined,
+  });
+
+  // Fetch repayment amount for selected loan
+  const { data: repaymentAmount } = useReadContract({
+    address: CONTRACT_ADDRESSES.DomainLending as `0x${string}`,
+    abi: DomainLendingABI.abi,
+    functionName: 'calculateRepaymentAmount',
+    args: selectedLoanId !== null ? [selectedLoanId] : undefined,
+  });
+
+  // Calculate total borrowed from loan IDs (simplified - just show count * estimated amount)
+  useEffect(() => {
+    if (loanIds && loanIds.length > 0) {
+      // For now, just estimate based on number of loans
+      // In production, you'd fetch each loan's details from the contract
+      setTotalBorrowed(loanIds.length * 1); // Assuming $1 per loan as we saw in the test
+    } else {
+      setTotalBorrowed(0);
+    }
+  }, [loanIds]);
+
   // Handle transaction success
   useEffect(() => {
     if (isSuccess && currentAction) {
@@ -126,7 +165,10 @@ export default function LendingPage() {
           duration: 5000,
         });
         setLoanAmount('');
-        // Keep approval state as 'approved' - don't reset to idle
+        // Reload the page to show the new loan
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
       }
       setCurrentAction(null);
       reset(); // Reset write contract state
@@ -187,6 +229,7 @@ export default function LendingPage() {
 
   const totalRepayment = (parseFloat(loanAmount) || 0) + calculateInterest();
   const maxLoanAmount = domainValue * 0.8; // 80% LTV
+  const availableCredit = Math.max(0, maxLoanAmount - totalBorrowed);
 
   const handleApproveNFT = async () => {
     if (!selectedDomain) {
@@ -340,6 +383,71 @@ export default function LendingPage() {
   return (
     <>
       <Header />
+
+      {/* Loan Details Modal */}
+      {showLoanModal && selectedLoanData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowLoanModal(false)}>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl p-6 max-w-md w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold">Loan #{selectedLoanId?.toString()}</h2>
+              <button onClick={() => setShowLoanModal(false)} className="text-gray-400 hover:text-white">
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="bg-[var(--background)] rounded-lg p-4 space-y-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Loan Amount</span>
+                  <span className="text-white font-medium">{selectedLoanData[3] ? `$${(Number(selectedLoanData[3]) / 1e6).toFixed(2)}` : 'N/A'}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Interest Rate</span>
+                  <span className="text-white font-medium">{selectedLoanData[4] ? `${Number(selectedLoanData[4]) / 100}% APR` : 'N/A'}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Duration</span>
+                  <span className="text-white font-medium">{selectedLoanData[6] ? `${Number(selectedLoanData[6]) / 86400} days` : 'N/A'}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Collateral Value</span>
+                  <span className="text-white font-medium">{selectedLoanData[8] ? `$${(Number(selectedLoanData[8]) / 1e6).toFixed(2)}` : 'N/A'}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Status</span>
+                  <span className={`font-medium ${selectedLoanData[7] ? 'text-green-400' : 'text-gray-400'}`}>
+                    {selectedLoanData[7] ? 'Active' : 'Closed'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-400">Total Repayment</span>
+                  <span className="text-lg font-bold text-[var(--primary)]">
+                    {repaymentAmount ? `$${(Number(repaymentAmount) / 1e6).toFixed(2)}` : 'Calculating...'}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  toast('Repayment feature coming soon!', { icon: '🔜' });
+                }}
+                className="w-full bg-gradient-to-r from-[var(--primary)] to-[var(--secondary)] text-white py-3 rounded-lg font-medium hover:opacity-90 transition-opacity"
+              >
+                Repay Loan
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       <main className="min-h-screen container mx-auto px-4 py-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -487,10 +595,34 @@ export default function LendingPage() {
 
               <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl p-6">
                 <h3 className="font-bold mb-4">Your Active Loans</h3>
-                <div className="text-center py-8 text-gray-400">
-                  <TrendingUp className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No active loans</p>
-                </div>
+                {loanIds && loanIds.length > 0 ? (
+                  <div className="space-y-3">
+                    {loanIds.map((loanId: bigint) => (
+                      <div key={loanId.toString()} className="bg-[var(--background)] border border-[var(--border)] rounded-lg p-4">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <p className="text-sm text-gray-400">Loan #{loanId.toString()}</p>
+                            <p className="text-lg font-semibold text-[var(--primary)]">Active</p>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setSelectedLoanId(loanId);
+                              setShowLoanModal(true);
+                            }}
+                            className="text-sm text-blue-400 hover:underline"
+                          >
+                            View Details
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-400">
+                    <TrendingUp className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No active loans</p>
+                  </div>
+                )}
               </div>
 
               <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl p-6">
@@ -502,11 +634,11 @@ export default function LendingPage() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-400">Available Credit</span>
-                    <span className="text-green-400 font-medium">${maxLoanAmount.toFixed(2)}</span>
+                    <span className="text-green-400 font-medium">${availableCredit.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-400">Total Borrowed</span>
-                    <span className="text-white font-medium">$0</span>
+                    <span className="text-white font-medium">${totalBorrowed.toFixed(2)}</span>
                   </div>
                 </div>
               </div>

@@ -34,12 +34,6 @@ export function Header() {
               Dashboard
             </Link>
             <Link
-              href="/marketplace"
-              className="text-gray-300 hover:text-white transition-colors"
-            >
-              Marketplace
-            </Link>
-            <Link
               href="/lending"
               className="text-gray-300 hover:text-white transition-colors"
             >
@@ -49,13 +43,7 @@ export function Header() {
               href="/leasing"
               className="text-gray-300 hover:text-white transition-colors"
             >
-              Leasing
-            </Link>
-            <Link
-              href="/revenue"
-              className="text-gray-300 hover:text-white transition-colors"
-            >
-              Revenue
+              Leasing & Fractionalization
             </Link>
           </nav>
 

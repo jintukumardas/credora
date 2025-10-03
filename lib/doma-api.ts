@@ -12,7 +12,7 @@ const getDomaApiBase = () => {
 };
 
 // API request helper - routes through Next.js API to avoid CORS
-async function domaApiRequest<T>(
+export async function domaApiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {

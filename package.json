@@ -2,15 +2,24 @@
   "name": "credora",
   "version": "0.1.0",
   "private": true,
+  "ts-node": {
+    "project": "tsconfig.hardhat.json",
+    "transpileOnly": true,
+    "require": ["ts-node/register"],
+    "compilerOptions": {
+      "module": "commonjs"
+    }
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "TS_NODE_PROJECT=tsconfig.hardhat.json hardhat test",
-    "test:lending": "TS_NODE_PROJECT=tsconfig.hardhat.json hardhat test test/DomainLending.test.ts",
-    "hardhat:node": "TS_NODE_PROJECT=tsconfig.hardhat.json hardhat node",
-    "hardhat:compile": "TS_NODE_PROJECT=tsconfig.hardhat.json hardhat compile"
+    "test": "hardhat test",
+    "test:lending": "hardhat test test/DomainLending.test.ts",
+    "hardhat:node": "hardhat node",
+    "hardhat:compile": "hardhat compile",
+    "deploy:fractionalization": "hardhat run scripts/deployFractionalization.ts --network domaTestnet"
   },
   "dependencies": {
     "@rainbow-me/rainbowkit": "^2.2.8",

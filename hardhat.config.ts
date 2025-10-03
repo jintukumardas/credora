@@ -1,6 +1,18 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
-require("dotenv").config({ path: ".env.local" });
+import { config as dotenvConfig } from "dotenv";
+
+dotenvConfig({ path: ".env.local" });
+
+// Register ts-node for TypeScript support
+import { register } from "ts-node";
+register({
+  project: "./tsconfig.hardhat.json",
+  transpileOnly: true,
+  compilerOptions: {
+    module: "commonjs",
+  },
+});
 
 const config: HardhatUserConfig = {
   paths: {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, DollarSign, AlertCircle, TrendingUp } from 'lucide-react';
 import { useBuyout, useBuyoutPrice, formatUsdc } from '@/lib/fractionalization-hooks';
@@ -26,11 +26,11 @@ export function BuyoutModal({
     if (isOpen && tokenId) {
       fetchPrice();
     }
-  }, [isOpen, tokenId]);
+  }, [isOpen, tokenId, fetchPrice]);
 
   const handleBuyout = async () => {
     try {
-      const result = await buyout(tokenId);
+      await buyout(tokenId);
       toast.success('Domain bought out successfully!');
       onClose();
     } catch (err) {

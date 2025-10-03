@@ -449,7 +449,7 @@ export default function LeasingPage() {
                     </li>
                     <li className="flex gap-2">
                       <span className="text-purple-400 font-bold">3.</span>
-                      <span><strong>Lessee Receives:</strong> Permission tokens transferred to lessee's wallet</span>
+                      <span><strong>Lessee Receives:</strong> Permission tokens transferred to lessee&apos;s wallet</span>
                     </li>
                     <li className="flex gap-2">
                       <span className="text-purple-400 font-bold">4.</span>
@@ -472,7 +472,7 @@ export default function LeasingPage() {
 
               <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl p-6">
                 <h3 className="font-bold mb-4">Your Active Leases</h3>
-                {lessorLeaseIds && lessorLeaseIds.length > 0 ? (
+                {lessorLeaseIds && Array.isArray(lessorLeaseIds) && lessorLeaseIds.length > 0 ? (
                   <div className="space-y-3">
                     {lessorLeaseIds.map((leaseId: bigint) => (
                       <div key={leaseId.toString()} className="bg-[var(--background)] rounded-lg p-4">
@@ -499,7 +499,7 @@ export default function LeasingPage() {
                 <div className="space-y-3">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-400">Total Leases</span>
-                    <span className="text-white font-medium">{lessorLeaseIds?.length || 0}</span>
+                    <span className="text-white font-medium">{Array.isArray(lessorLeaseIds) ? lessorLeaseIds.length : 0}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-400">Platform Fee Rate</span>

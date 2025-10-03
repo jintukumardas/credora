@@ -59,11 +59,11 @@ export default function LendingPage() {
   const [selectedDomain, setSelectedDomain] = useState<DomainToken | null>(null);
   const [loanAmount, setLoanAmount] = useState('');
   const [duration, setDuration] = useState('30');
-  const [interestRate] = useState(8.5); // Fixed for demo
+  const [interestRate, setInterestRate] = useState('8.5');
   const [domainValue, setDomainValue] = useState(0);
   const [approvalStep, setApprovalStep] = useState<'idle' | 'approving' | 'approved'>('idle');
   const [currentAction, setCurrentAction] = useState<'approve' | 'loan' | null>(null);
-  const [activeLoans, setActiveLoans] = useState<any[]>([]);
+  const [activeLoans, setActiveLoans] = useState<unknown[]>([]);
   const [totalBorrowed, setTotalBorrowed] = useState(0);
   const [selectedLoanId, setSelectedLoanId] = useState<bigint | null>(null);
   const [showLoanModal, setShowLoanModal] = useState(false);
@@ -142,7 +142,7 @@ export default function LendingPage() {
 
   // Calculate total borrowed from loan IDs (simplified - just show count * estimated amount)
   useEffect(() => {
-    if (loanIds && loanIds.length > 0) {
+    if (Array.isArray(loanIds) && loanIds.length > 0) {
       // For now, just estimate based on number of loans
       // In production, you'd fetch each loan's details from the contract
       setTotalBorrowed(loanIds.length * 1); // Assuming $1 per loan as we saw in the test
@@ -224,7 +224,8 @@ export default function LendingPage() {
   const calculateInterest = () => {
     const amount = parseFloat(loanAmount) || 0;
     const days = parseInt(duration) || 0;
-    return (amount * interestRate * days) / (365 * 100);
+    const rate = parseFloat(interestRate) || 0;
+    return (amount * rate * days) / (365 * 100);
   };
 
   const totalRepayment = (parseFloat(loanAmount) || 0) + calculateInterest();
@@ -343,7 +344,7 @@ export default function LendingPage() {
       const loanAmountWei = parseUnits(amount.toString(), 6);
       const domainValueWei = parseUnits(domainValue.toString(), 6);
       const durationSeconds = BigInt(durationDays * 24 * 60 * 60);
-      const interestRateBps = BigInt(Math.floor(interestRate * 100)); // Convert to basis points
+      const interestRateBps = BigInt(Math.floor(parseFloat(interestRate) * 100)); // Convert to basis points
 
       console.log('Creating loan with params:', {
         domainNFT: CONTRACT_ADDRESSES.DomaOwnershipToken,
@@ -404,24 +405,24 @@ export default function LendingPage() {
               <div className="bg-[var(--background)] rounded-lg p-4 space-y-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Loan Amount</span>
-                  <span className="text-white font-medium">{selectedLoanData[3] ? `$${(Number(selectedLoanData[3]) / 1e6).toFixed(2)}` : 'N/A'}</span>
+                  <span className="text-white font-medium">{selectedLoanData && Array.isArray(selectedLoanData) && selectedLoanData[3] ? `$${(Number(selectedLoanData[3]) / 1e6).toFixed(2)}` : 'N/A'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Interest Rate</span>
-                  <span className="text-white font-medium">{selectedLoanData[4] ? `${Number(selectedLoanData[4]) / 100}% APR` : 'N/A'}</span>
+                  <span className="text-white font-medium">{selectedLoanData && Array.isArray(selectedLoanData) && selectedLoanData[4] ? `${Number(selectedLoanData[4]) / 100}% APR` : 'N/A'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Duration</span>
-                  <span className="text-white font-medium">{selectedLoanData[6] ? `${Number(selectedLoanData[6]) / 86400} days` : 'N/A'}</span>
+                  <span className="text-white font-medium">{selectedLoanData && Array.isArray(selectedLoanData) && selectedLoanData[6] ? `${Number(selectedLoanData[6]) / 86400} days` : 'N/A'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Collateral Value</span>
-                  <span className="text-white font-medium">{selectedLoanData[8] ? `$${(Number(selectedLoanData[8]) / 1e6).toFixed(2)}` : 'N/A'}</span>
+                  <span className="text-white font-medium">{selectedLoanData && Array.isArray(selectedLoanData) && selectedLoanData[8] ? `$${(Number(selectedLoanData[8]) / 1e6).toFixed(2)}` : 'N/A'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Status</span>
-                  <span className={`font-medium ${selectedLoanData[7] ? 'text-green-400' : 'text-gray-400'}`}>
-                    {selectedLoanData[7] ? 'Active' : 'Closed'}
+                  <span className={`font-medium ${selectedLoanData && Array.isArray(selectedLoanData) && selectedLoanData[7] ? 'text-green-400' : 'text-gray-400'}`}>
+                    {selectedLoanData && Array.isArray(selectedLoanData) && selectedLoanData[7] ? 'Active' : 'Closed'}
                   </span>
                 </div>
               </div>
@@ -498,6 +499,23 @@ export default function LendingPage() {
                 )}
 
                 <div>
+                  <label className="block text-sm text-gray-400 mb-2">Collateral Value (USDC)</label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-3.5 w-5 h-5 text-gray-500" />
+                    <input
+                      type="number"
+                      value={domainValue}
+                      onChange={(e) => setDomainValue(parseFloat(e.target.value) || 0)}
+                      placeholder="0.00"
+                      className="w-full bg-[var(--background)] border border-[var(--border)] rounded-lg pl-10 pr-4 py-3 text-white"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {selectedDomain && `Estimated value: $${estimateDomainValue(selectedDomain).toFixed(2)} (you can adjust)`}
+                  </p>
+                </div>
+
+                <div>
                   <label className="block text-sm text-gray-400 mb-2">Loan Amount (USDC)</label>
                   <div className="relative">
                     <DollarSign className="absolute left-3 top-3.5 w-5 h-5 text-gray-500" />
@@ -527,11 +545,24 @@ export default function LendingPage() {
                   </div>
                 </div>
 
-                <div className="bg-[var(--background)] rounded-lg p-4 space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-400">Interest Rate</span>
-                    <span className="text-white font-medium">{interestRate}% APR</span>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">Interest Rate (% APR)</label>
+                  <div className="relative">
+                    <TrendingUp className="absolute left-3 top-3.5 w-5 h-5 text-gray-500" />
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="100"
+                      value={interestRate}
+                      onChange={(e) => setInterestRate(e.target.value)}
+                      placeholder="8.5"
+                      className="w-full bg-[var(--background)] border border-[var(--border)] rounded-lg pl-10 pr-4 py-3 text-white"
+                    />
                   </div>
+                </div>
+
+                <div className="bg-[var(--background)] rounded-lg p-4 space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-400">Interest Amount</span>
                     <span className="text-white font-medium">${calculateInterest().toFixed(2)}</span>
@@ -595,7 +626,7 @@ export default function LendingPage() {
 
               <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl p-6">
                 <h3 className="font-bold mb-4">Your Active Loans</h3>
-                {loanIds && loanIds.length > 0 ? (
+                {Array.isArray(loanIds) && loanIds.length > 0 ? (
                   <div className="space-y-3">
                     {loanIds.map((loanId: bigint) => (
                       <div key={loanId.toString()} className="bg-[var(--background)] border border-[var(--border)] rounded-lg p-4">

@@ -2,7 +2,7 @@
  * Bridge Service - Multi-chain bridging and liquidity management
  */
 
-import { Address, parseEther } from 'viem';
+import { Address, parseEther, formatEther } from 'viem';
 
 export interface ChainInfo {
   id: number;

@@ -7,6 +7,7 @@ import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit';
 import { config } from '@/lib/wagmi-config';
 import { useState } from 'react';
 import { Toaster } from 'react-hot-toast';
+import { Notifications } from '@/components/Notifications';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient());
@@ -52,6 +53,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
               },
             }}
           />
+          <Notifications />
           {children}
         </RainbowKitProvider>
       </QueryClientProvider>

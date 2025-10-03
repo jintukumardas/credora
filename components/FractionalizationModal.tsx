@@ -1,23 +1,34 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, DollarSign, Coins, AlertCircle } from 'lucide-react';
+import { X, DollarSign, Coins, AlertCircle, CheckCircle, Shield } from 'lucide-react';
 import { useFractionalize } from '@/lib/fractionalization-hooks';
-import { toast } from 'react-hot-toast';
-import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useWriteContract, useReadContract, useWaitForTransactionReceipt } from 'wagmi';
 import { CONTRACT_ADDRESSES } from '@/lib/contract-addresses';
+import { toast } from 'react-hot-toast';
 
+// Minimal ERC721 ABI for approve function
 const ERC721_ABI = [
   {
-    name: 'approve',
+    name: 'setApprovalForAll',
     type: 'function',
     stateMutability: 'nonpayable',
     inputs: [
-      { name: 'to', type: 'address' },
-      { name: 'tokenId', type: 'uint256' },
+      { name: 'operator', type: 'address' },
+      { name: 'approved', type: 'bool' },
     ],
     outputs: [],
+  },
+  {
+    name: 'isApprovedForAll',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'owner', type: 'address' },
+      { name: 'operator', type: 'address' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
   },
 ] as const;
 
@@ -38,44 +49,61 @@ export function FractionalizationModal({
   const [tokenSymbol, setTokenSymbol] = useState('FRAC');
   const [minimumBuyoutPrice, setMinimumBuyoutPrice] = useState('1000');
   const [totalSupply, setTotalSupply] = useState('1000000');
-  const [isApproving, setIsApproving] = useState(false);
+  const [approvalStep, setApprovalStep] = useState<'idle' | 'approving' | 'approved'>('idle');
 
+  const { address } = useAccount();
   const { fractionalize, isLoading, error } = useFractionalize();
-  const { writeContract, data: approvalHash, isPending: isApprovalPending } = useWriteContract();
-  const { isSuccess: isApprovalSuccess } = useWaitForTransactionReceipt({ hash: approvalHash });
+  const { data: approvalHash, writeContract: writeApproval, isPending: isApproving, reset: resetApproval } = useWriteContract();
+  const { isLoading: isApprovingConfirm, isSuccess: isApprovalSuccess } = useWaitForTransactionReceipt({ hash: approvalHash });
+
+  // Check if operator has approval
+  const { data: isApprovedForAll, refetch: refetchApproval } = useReadContract({
+    address: CONTRACT_ADDRESSES.DomaOwnershipToken as `0x${string}`,
+    abi: ERC721_ABI,
+    functionName: 'isApprovedForAll',
+    args: address ? [address as `0x${string}`, CONTRACT_ADDRESSES.DomaFractionalization as `0x${string}`] : undefined,
+  });
+
+  // Update approval step when approval status changes
+  useEffect(() => {
+    if (isApprovedForAll === true) {
+      setApprovalStep('approved');
+    } else if (isApprovedForAll === false) {
+      setApprovalStep('idle');
+    }
+  }, [isApprovedForAll]);
+
+  // Handle approval success
+  useEffect(() => {
+    if (isApprovalSuccess) {
+      setApprovalStep('approved');
+      toast.success('NFT approved for fractionalization!');
+      refetchApproval();
+      resetApproval();
+    }
+  }, [isApprovalSuccess, refetchApproval, resetApproval]);
 
   const handleApprove = async () => {
     try {
-      setIsApproving(true);
-      const toastId = toast.loading('Approving NFT transfer...');
-
-      writeContract({
+      setApprovalStep('approving');
+      writeApproval({
         address: CONTRACT_ADDRESSES.DomaOwnershipToken as `0x${string}`,
         abi: ERC721_ABI,
-        functionName: 'approve',
-        args: [CONTRACT_ADDRESSES.DomaFractionalization as `0x${string}`, BigInt(tokenId)],
+        functionName: 'setApprovalForAll',
+        args: [CONTRACT_ADDRESSES.DomaFractionalization as `0x${string}`, true],
       });
-
-      // Wait for approval
-      const checkApproval = setInterval(() => {
-        if (isApprovalSuccess) {
-          clearInterval(checkApproval);
-          toast.dismiss(toastId);
-          toast.success('NFT approved! Now fractionalizing...');
-          handleFractionalize();
-        }
-      }, 1000);
     } catch (err) {
-      setIsApproving(false);
+      console.error('Approval error:', err);
       toast.error('Failed to approve NFT');
-      console.error(err);
+      setApprovalStep('idle');
     }
   };
 
   const handleFractionalize = async () => {
     try {
       // Check if fractionalization contract is deployed
-      if (CONTRACT_ADDRESSES.DomaFractionalization === '0x0000000000000000000000000000000000000000') {
+      if (process.env.NEXT_PUBLIC_DOMA_FRACTIONALIZATION === '0x0000000000000000000000000000000000000000' ||
+          !process.env.NEXT_PUBLIC_DOMA_FRACTIONALIZATION) {
         toast.error(
           'Fractionalization contract not deployed on testnet yet. Feature coming soon!',
           { duration: 6000 }
@@ -83,18 +111,21 @@ export function FractionalizationModal({
         return;
       }
 
-      const result = await fractionalize(tokenId, {
-        name: tokenName,
-        symbol: tokenSymbol,
-      }, minimumBuyoutPrice, totalSupply);
+      const result = await fractionalize(
+        tokenId,
+        {
+          name: tokenName,
+          symbol: tokenSymbol,
+        },
+        minimumBuyoutPrice,
+        totalSupply
+      );
 
       toast.success('Domain fractionalized successfully!');
       onClose();
     } catch (err) {
       toast.error('Failed to fractionalize domain');
       console.error(err);
-    } finally {
-      setIsApproving(false);
     }
   };
 
@@ -175,7 +206,7 @@ export function FractionalizationModal({
                 className="w-full bg-[var(--background)] border border-[var(--border)] rounded-lg px-4 py-3 text-white"
               />
               <p className="text-xs text-gray-500 mt-1">
-                Total number of fractional tokens to mint (default: 1,000,000)
+                Total number of fractional tokens to create (you will receive 97.5% after protocol fee)
               </p>
             </div>
 
@@ -215,6 +246,30 @@ export function FractionalizationModal({
             </div>
           </div>
 
+          {/* Approval Status */}
+          {approvalStep !== 'approved' && (
+            <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 mb-4">
+              <div className="flex gap-2">
+                <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-gray-300">
+                  <p className="font-medium text-yellow-400 mb-1">Approval Required</p>
+                  <p>You need to approve the fractionalization contract to transfer your NFT.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {approvalStep === 'approved' && (
+            <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4 mb-4">
+              <div className="flex gap-2">
+                <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-gray-300">
+                  <p className="font-medium text-green-400">NFT Approved ✓</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Error */}
           {error && (
             <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 mb-4">
@@ -226,18 +281,30 @@ export function FractionalizationModal({
           <div className="flex gap-3">
             <button
               onClick={onClose}
-              disabled={isLoading || isApproving}
+              disabled={isLoading || isApproving || isApprovingConfirm}
               className="flex-1 bg-[var(--background)] border border-[var(--border)] py-3 rounded-lg font-medium hover:bg-[var(--card-bg)] transition-colors disabled:opacity-50"
             >
               Cancel
             </button>
-            <button
-              onClick={handleApprove}
-              disabled={isLoading || isApproving || !tokenName || !tokenSymbol || !minimumBuyoutPrice || !totalSupply}
-              className="flex-1 bg-gradient-to-r from-[var(--primary)] to-[var(--secondary)] text-white py-3 rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-            >
-              {isApproving || isLoading ? 'Processing...' : 'Approve & Fractionalize'}
-            </button>
+            {approvalStep !== 'approved' ? (
+              <button
+                onClick={handleApprove}
+                disabled={isApproving || isApprovingConfirm}
+                className="flex-1 bg-gradient-to-r from-blue-600 to-blue-500 text-white py-3 rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                <Shield className="w-5 h-5 inline mr-2" />
+                {isApproving || isApprovingConfirm ? 'Approving...' : 'Approve NFT'}
+              </button>
+            ) : (
+              <button
+                onClick={handleFractionalize}
+                disabled={isLoading || !tokenName || !tokenSymbol || !minimumBuyoutPrice || !totalSupply}
+                className="flex-1 bg-gradient-to-r from-[var(--primary)] to-[var(--secondary)] text-white py-3 rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                <Coins className="w-5 h-5 inline mr-2" />
+                {isLoading ? 'Processing...' : 'Fractionalize'}
+              </button>
+            )}
           </div>
         </motion.div>
       </div>

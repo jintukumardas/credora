@@ -11,6 +11,9 @@ import { parseEther, formatEther, parseUnits } from 'viem';
 import { CONTRACT_ADDRESSES } from './contract-addresses';
 import DomaFractionalizationABI from './abis/DomaFractionalization.json';
 
+/**
+ * Type definition for a fractionalized domain
+ */
 interface FractionalizedDomain {
   tokenId: string;
   fractionalToken: string;
@@ -33,7 +36,7 @@ export function useFractionalize() {
     tokenId: string,
     tokenInfo: { name: string; symbol: string },
     minimumBuyoutPriceUsdc: string,
-    totalSupplyTokens?: string
+    totalSupply?: string
   ) => {
     if (!address) {
       throw new Error('Wallet not connected');
@@ -46,11 +49,8 @@ export function useFractionalize() {
       // Convert USDC to base units (6 decimals)
       const minimumBuyoutPrice = parseUnits(minimumBuyoutPriceUsdc, 6);
 
-      // Total supply: use provided value or default to 1,000,000 tokens with 18 decimals
-      const totalSupply = parseEther(totalSupplyTokens || '1000000');
-
-      // Launchpad address - use user's address as initial recipient
-      const launchpadAddress = address;
+      // Default total supply: 1,000,000 tokens with 18 decimals
+      const supply = totalSupply ? parseEther(totalSupply) : parseEther('1000000');
 
       // Call contract with all required parameters
       const hash = await writeContractAsync({
@@ -64,9 +64,9 @@ export function useFractionalize() {
             name: tokenInfo.name,
             symbol: tokenInfo.symbol,
           }, // fractionalTokenInfo
-          totalSupply, // totalSupply
+          supply, // totalSupply
           minimumBuyoutPrice, // minimumBuyoutPrice
-          launchpadAddress, // launchpad (user receives tokens)
+          address as `0x${string}`, // launchpad (user receives the tokens)
         ],
       });
 
@@ -106,7 +106,7 @@ export function useBuyout() {
         address: CONTRACT_ADDRESSES.DomaFractionalization as `0x${string}`,
         abi: DomaFractionalizationABI,
         functionName: 'buyoutOwnershipToken',
-        args: [BigInt(tokenId)],
+        args: [CONTRACT_ADDRESSES.DomaOwnershipToken as `0x${string}`, BigInt(tokenId)],
       });
 
       return { transactionHash: hash, success: true };
@@ -172,7 +172,7 @@ export function useBuyoutPrice(tokenId: string | null) {
     address: CONTRACT_ADDRESSES.DomaFractionalization as `0x${string}`,
     abi: DomaFractionalizationABI,
     functionName: 'getOwnershipTokenBuyoutPrice',
-    args: tokenId ? [BigInt(tokenId)] : undefined,
+    args: tokenId ? [CONTRACT_ADDRESSES.DomaOwnershipToken as `0x${string}`, BigInt(tokenId)] : undefined,
     query: {
       enabled: !!tokenId,
     },

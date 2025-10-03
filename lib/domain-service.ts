@@ -96,7 +96,12 @@ export class DomainService {
       }
     `;
 
-    const result = await graphqlClient.request(query, {
+    const result = await graphqlClient.request<{
+      domains: {
+        items: Array<Record<string, unknown>>;
+        totalCount: number
+      }
+    }>(query, {
       filters: {
         query: params.query,
         minValue: params.minValue?.toString(),
@@ -112,7 +117,18 @@ export class DomainService {
       },
     });
 
-    const domains = this.transformDomains(result.domains.items);
+    const domains = this.transformDomains(result.domains.items as Array<{
+      tokenId?: string;
+      name?: string;
+      tld?: string;
+      owner?: string;
+      valuation?: string | number;
+      confidence?: number;
+      isPremium?: boolean;
+      expiryTime?: string | number;
+      metadata?: DomainMetadata;
+      fractionalized?: boolean;
+    }>);
     this.setCache(cacheKey, domains);
     return domains;
   }
@@ -251,12 +267,12 @@ export class DomainService {
     const basePrice = parseEther('0.1'); // Base price in ETH
     const multiplier = BigInt(Math.floor(averageFactor));
 
-    return (basePrice * multiplier) / 100n;
+    return (basePrice * multiplier) / BigInt(100);
   }
 
   private calculateMarketMultiplier(
     factors: DomainValuation['factors'],
-    marketData: any
+    _marketData: { averagePrice: number; volume: number }
   ): number {
     // Calculate based on market conditions
     return 100 + Math.floor((factors.marketDemand / 100) * 50);
@@ -336,8 +352,21 @@ export class DomainService {
       }
     `;
 
-    const result = await graphqlClient.request(query, { tokenId });
-    return this.transformDomains([result.domain])[0];
+    const result = await graphqlClient.request<{
+      domain: Record<string, unknown>
+    }>(query, { tokenId });
+    return this.transformDomains([result.domain as {
+      tokenId?: string;
+      name?: string;
+      tld?: string;
+      owner?: string;
+      valuation?: string | number;
+      confidence?: number;
+      isPremium?: boolean;
+      expiryTime?: string | number;
+      metadata?: DomainMetadata;
+      fractionalized?: boolean;
+    }])[0];
   }
 }
 
@@ -345,7 +374,7 @@ export class DomainService {
 export interface DomainEvent {
   type: 'registered' | 'transferred' | 'listed' | 'sold' | 'fractionalized';
   tokenId: string;
-  data: any;
+  data: Record<string, unknown>;
   timestamp: number;
 }
 

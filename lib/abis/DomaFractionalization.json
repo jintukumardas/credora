@@ -2,6 +2,11 @@
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "tokenAddress",
+        "type": "address"
+      },
+      {
         "internalType": "uint256",
         "name": "tokenId",
         "type": "uint256"
@@ -25,17 +30,38 @@
       },
       {
         "internalType": "uint256",
+        "name": "totalSupply",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
         "name": "minimumBuyoutPrice",
         "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "launchpad",
+        "type": "address"
       }
     ],
     "name": "fractionalizeOwnershipToken",
-    "outputs": [],
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
     "stateMutability": "nonpayable",
     "type": "function"
   },
   {
     "inputs": [
+      {
+        "internalType": "address",
+        "name": "tokenAddress",
+        "type": "address"
+      },
       {
         "internalType": "uint256",
         "name": "tokenId",
@@ -67,6 +93,11 @@
   },
   {
     "inputs": [
+      {
+        "internalType": "address",
+        "name": "tokenAddress",
+        "type": "address"
+      },
       {
         "internalType": "uint256",
         "name": "tokenId",

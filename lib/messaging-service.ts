@@ -3,11 +3,20 @@
  */
 
 // XMTP types - would be imported from @xmtp/xmtp-js when installed
+interface Conversation {
+  topic: string;
+  send: (message: string) => Promise<void>;
+  streamMessages: () => Promise<AsyncIterableIterator<Message>>;
+  messages: () => Promise<Message[]>;
+  peerAddress: string;
+  createdAt: Date;
+}
+
 interface Client {
   address: string;
   conversations: {
-    newConversation: (address: string) => Promise<any>;
-    list: () => Promise<any[]>;
+    newConversation: (address: string) => Promise<Conversation>;
+    list: () => Promise<Conversation[]>;
   };
   canMessage: (address: string) => Promise<boolean>;
 }
@@ -87,14 +96,20 @@ export class MessagingService {
       this.xmtpClient = {
         address: wallet.address,
         conversations: {
-          newConversation: async (_address: string) => ({
+          newConversation: async (_address: string): Promise<Conversation> => ({
             topic: `conv-${Date.now()}`,
-            send: async (_message: string) => {}
+            send: async (_message: string) => {},
+            streamMessages: async () => {
+              return (async function* () {})() as AsyncIterableIterator<Message>;
+            },
+            messages: async () => [],
+            peerAddress: _address,
+            createdAt: new Date()
           }),
           list: async () => []
         },
         canMessage: async (_address: string) => true
-      } as Client;
+      };
       console.log('XMTP client initialized for address:', wallet.address);
     } catch (error) {
       console.error('Failed to initialize XMTP client:', error);
@@ -261,7 +276,7 @@ export class MessagingService {
 
     // Return cleanup function
     return () => {
-      stream.return();
+      stream.return?.();
     };
   }
 

@@ -4,6 +4,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
+import { MessageCircle } from 'lucide-react';
 
 export function Header() {
   return (
@@ -34,6 +35,12 @@ export function Header() {
               Dashboard
             </Link>
             <Link
+              href="/marketplace"
+              className="text-gray-300 hover:text-white transition-colors"
+            >
+              Marketplace
+            </Link>
+            <Link
               href="/lending"
               className="text-gray-300 hover:text-white transition-colors"
             >
@@ -44,6 +51,13 @@ export function Header() {
               className="text-gray-300 hover:text-white transition-colors"
             >
               Leasing & Fractionalization
+            </Link>
+            <Link
+              href="/messaging"
+              className="text-gray-300 hover:text-white transition-colors flex items-center gap-2"
+            >
+              <MessageCircle className="w-4 h-4" />
+              Messages
             </Link>
           </nav>
 

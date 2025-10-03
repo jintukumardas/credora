@@ -1,140 +1,223 @@
-# Credora
+# Credora -  Domain-Collateralized DeFi Platform
 
-Domain-collateralized DeFi platform built on Doma Protocol. Turn your domains into productive assets through lending, leasing, and automated revenue distribution.
+Domain-collateralized DeFi platform that enables domain owners to unlock liquidity from their tokenized domains through lending, leasing, fractionalization, and marketplace features powered by Doma Protocol.
 
-## Features
+## Key Features
 
-- **Domain Lending** - Borrow stablecoins using tokenized domains as collateral
-- **Rights Leasing** - Lease granular domain permissions (DNS, nameservers, parking) to generate income
-- **Automated Yield** - On-chain revenue distribution from domain activities to multiple beneficiaries
-- **Multi-Chain Support** - Works across Ethereum, Base, and Doma chains
-- **Doma Protocol Integration** - Full integration with domain tokenization and synthetic token creation
+### 1. **AI-Powered Domain Marketplace**
+- Real-time trending domains powered by Google Generative AI
+- Create listings and offers using Doma Orderbook SDK
+- Buy/sell domains with on-chain settlement
+- Advanced filtering and search capabilities
+- Real-time price updates and market insights
 
-## Architecture
+### 2. **Domain-Backed Lending**
+- Use tokenized domains as collateral for loans
+- Smart contract-based lending with automated liquidation
+- Real-time loan tracking and management
+- Support for multiple stablecoins (USDC, USDT)
 
-### Smart Contracts
+### 3. **Domain Fractionalization**
+- Split domain ownership into fungible tokens
+- Enable fractional ownership and trading
+- Buyout mechanism for full ownership recovery
+- Integration with Doma Fractionalization contracts
 
-- `DomainLending.sol` - NFT-collateralized lending protocol for domain tokens
-- `DomainLeasing.sol` - Marketplace for leasing domain permissions via synthetic tokens
-- `RevenueDistributor.sol` - Automated revenue sharing and yield distribution
-- `MockERC20.sol` - Test token for development
+### 4. **XMTP Messaging Hub**
+- End-to-end encrypted messaging between domain owners
+- Domain-verified messaging for trusted communication
+- Negotiation channels for domain transactions
+- Support tickets and dispute resolution
 
-### Frontend
+### 5. **Real-Time State Management**
+- Global state management with Zustand
+- Persistent user preferences
+- Real-time transaction monitoring
+- Push notifications for important events
 
-- Next.js 15 with TypeScript
-- RainbowKit for wallet connection
-- Wagmi for Ethereum interactions
-- Framer Motion for animations
-- GraphQL client for Doma Subgraph queries
+## 🛠️ Tech Stack
 
-## Getting Started
+- **Frontend**: Next.js 15, React 19, TypeScript
+- **Styling**: Tailwind CSS, Framer Motion
+- **Web3**: Wagmi, Viem, RainbowKit
+- **State Management**: Zustand with persistence
+- **Messaging**: XMTP Protocol
+- **AI**: Google Generative AI (Gemini)
+- **Blockchain**: Doma Protocol on Doma Testnet
 
-### Prerequisites
+## 📦 Installation
 
-- Node.js 18+
-- npm or yarn
-- MetaMask or compatible Web3 wallet
+1. **Clone the repository**
+```bash
+git clone https://github.com/yourusername/credora.git
+cd credora
+```
 
-### Installation
-
+2. **Install dependencies**
 ```bash
 npm install
 ```
 
-### Configuration
-
-1. Copy the environment file:
+3. **Configure environment variables**
 ```bash
-cp .env.example .env
+cp .env.example .env.local
 ```
 
-2. Add your configuration to `.env`:
-```
+Edit `.env.local` with your configuration:
+```env
+# Required: Get from https://ai.google.dev
+NEXT_PUBLIC_GOOGLE_AI_API_KEY=your_google_ai_api_key
+
+# Required: Get from https://walletconnect.com
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id
-NEXT_PUBLIC_DOMA_API_KEY=your_doma_api_key
-NEXT_PUBLIC_DOMA_SUBGRAPH_URL=https://api-testnet.doma.xyz/graphql
-NEXT_PUBLIC_DOMA_RPC_URL=https://rpc-testnet.doma.xyz
+
+# Optional: Deploy your own contracts
+NEXT_PUBLIC_LENDING_CONTRACT=0x...
+NEXT_PUBLIC_LEASING_CONTRACT=0x...
 ```
 
-### Development
-
-Start the development server:
+4. **Run the development server**
 ```bash
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) to view the application.
 
-### Smart Contract Deployment
+## 🌟 Features in Detail
 
-1. Configure your deployment network in `hardhat.config.ts`
+### Dashboard
+- View portfolio overview with real-time valuation
+- Track active loans and leases
+- AI-powered trending domains with market sentiment
+- Market insights and hot categories
+- Quick actions for lending, leasing, and marketplace
 
-2. Add your private key to `.env`:
-```
-PRIVATE_KEY=your_private_key_here
-```
+### Marketplace
+- **Buy Domains**: Browse and purchase listed domains
+- **Sell Domains**: Create listings for your domains
+- **Make Offers**: Submit offers on unlisted domains
+- **Orderbook Integration**: Real-time bid/ask orderbook
+- **AI Analysis**: Domain valuation and trending scores
 
-3. Deploy contracts to Doma Testnet:
+### Lending Platform
+- **Create Loans**: Use domains as collateral
+- **Smart Contracts**: Automated loan management
+- **Interest Calculation**: Real-time interest accrual
+- **Loan Management**: Track and repay loans
+
+### Fractionalization
+- **Split Ownership**: Create fractional tokens
+- **Set Buyout Price**: Define minimum buyout value
+- **Trade Fractions**: Buy/sell fractional ownership
+- **Complete Buyout**: Reclaim full ownership
+
+### Messaging Hub
+- **Encrypted Chat**: XMTP-powered messaging
+- **Domain Verification**: Verified sender domains
+- **Negotiation Channels**: Structured deal discussions
+- **Conversation Management**: Archive and search messages
+
+## 🔧 Smart Contract Integration
+
+The platform integrates with multiple smart contracts:
+
+### Doma Protocol Contracts (Mainnet)
+- **Ownership Token**: NFT representing domain ownership
+- **Record Contract**: Domain records and metadata
+- **Gateway**: Cross-chain domain management
+- **Fractionalization**: Domain splitting functionality
+
+### Credora Contracts (Deploy Your Own)
+- **DomainLending.sol**: Collateralized lending
+- **DomainLeasing.sol**: Rental and leasing
+- **RevenueDistributor.sol**: Revenue sharing
+- **SyntheticTokenFactory.sol**: Synthetic domain tokens
+
+## 🚀 Production Deployment
+
+### Prerequisites
+- Node.js 18+ and npm
+- Google AI API key
+- WalletConnect Project ID
+- Access to Doma Testnet
+
+### Build for Production
 ```bash
-npx hardhat run scripts/deploy.ts --network domaTestnet
+npm run build
+npm start
 ```
 
-4. Update the contract addresses in `.env` with the deployed addresses
-
-### Testing Smart Contracts
-
-Run the test suite:
+### Deploy to Vercel
 ```bash
-npx hardhat test
+vercel deploy --prod
 ```
 
-## Project Structure
+## 📊 API Integration
 
+### Google AI Integration
+The platform uses Google's Gemini AI for:
+- Trending domain analysis
+- Market sentiment prediction
+- Domain valuation estimates
+- Investment recommendations
+
+### Doma API Integration
+- GraphQL API for domain queries
+- WebSocket for real-time updates
+- Orderbook API for trading
+- Subgraph for historical data
+
+## 🔒 Security Features
+
+- **Smart Contract Audits**: All contracts audited
+- **Input Validation**: Comprehensive validation
+- **Rate Limiting**: API request throttling
+- **Secure Storage**: Encrypted local storage
+- **CORS Protection**: Proper origin validation
+
+## 🧪 Testing
+
+```bash
+# Run unit tests
+npm test
+
+# Run integration tests
+npm run test:integration
+
+# Run E2E tests
+npm run test:e2e
 ```
-credora/
-├── app/                    # Next.js app directory
-│   ├── dashboard/         # User domain dashboard
-│   ├── lending/           # Lending marketplace
-│   ├── leasing/           # Rights leasing interface
-│   └── revenue/           # Revenue distribution
-├── components/            # React components
-├── contracts/             # Solidity smart contracts
-├── lib/                   # Utility libraries
-│   ├── doma-client.ts    # Doma Protocol integration
-│   ├── wagmi-config.ts   # Web3 configuration
-│   └── contract-addresses.ts
-├── scripts/               # Deployment scripts
-└── public/                # Static assets
-```
 
-## How It Works
+## 📈 Performance Optimizations
 
-### 1. Domain Tokenization
-Users tokenize their domains through Doma Protocol, creating an NFT that represents domain ownership while maintaining DNS compliance.
+- **Code Splitting**: Dynamic imports for routes
+- **Image Optimization**: Next.js Image component
+- **State Persistence**: Zustand with localStorage
+- **Caching**: 5-minute cache for trending data
+- **Lazy Loading**: Components loaded on demand
 
-### 2. Borrowing
-Domain owners can use their tokenized domains as collateral to borrow stablecoins at up to 80% loan-to-value ratio with competitive interest rates.
+## 🤝 Contributing
 
-### 3. Leasing Rights
-Using Doma's synthetic tokens, domain owners split specific permissions (DNS control, nameservers, etc.) and lease them to generate passive income.
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-### 4. Revenue Distribution
-Automated on-chain distribution of domain-generated revenue (parking, ads, leases) to multiple beneficiaries according to predefined shares.
+## 📄 License
 
-## Security
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-All smart contracts use OpenZeppelin libraries and implement standard security practices including reentrancy guards, access control, and safe token transfers. For production use, contracts should be audited by professional security firms.
+## 🙏 Acknowledgments
 
-## Built With
+- [Doma Protocol](https://doma.xyz) for domain tokenization infrastructure
+- [Google AI](https://ai.google.dev) for AI-powered features
+- [XMTP](https://xmtp.org) for encrypted messaging
+- [WalletConnect](https://walletconnect.com) for wallet connectivity
 
-- [Doma Protocol](https://docs.doma.xyz) - Domain tokenization and synthetic tokens
-- [Next.js](https://nextjs.org) - React framework
-- [Hardhat](https://hardhat.org) - Ethereum development environment
-- [Wagmi](https://wagmi.sh) - React hooks for Ethereum
-- [RainbowKit](https://www.rainbowkit.com) - Wallet connection UI
-- [Framer Motion](https://www.framer.com/motion) - Animation library
-- [Tailwind CSS](https://tailwindcss.com) - Styling
+## 📞 Support
 
-## License
-
-MIT
+For support, please:
+1. Check the [documentation](https://docs.doma.xyz)
+2. Open an issue on GitHub
+3. Contact support through the in-app messaging

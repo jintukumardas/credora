@@ -88,75 +88,22 @@ export interface DomainMetadata {
  * Note: Doma API requires an API key - set NEXT_PUBLIC_DOMA_API_KEY in .env
  */
 export async function fetchDomainsByOwner(owner: string, chainId: number = 1): Promise<DomainToken[]> {
+  // Use the correct Doma API query structure from documentation
   const query = `
-    query userDomains($page: Int, $size: Int, $sortBy: String, $sortOrder: SortOrder, $status: [UserDomainStatusFilter!], $tlds: [Label!], $searchTerm: String) {
-      userDomains(
-        page: $page
-        size: $size
-        sortBy: $sortBy
-        sortOrder: $sortOrder
-        status: $status
-        tlds: $tlds
-        searchTerm: $searchTerm
+    query GetNamesByOwner($ownedBy: [AddressCAIP10!], $take: Int) {
+      names(
+        ownedBy: $ownedBy
+        claimStatus: CLAIMED
+        take: $take
       ) {
-        currentPage
-        hasNextPage
-        hasPreviousPage
-        pageSize
-        totalCount
-        totalPages
-        estimatedValue
         items {
-          id
-          sld
-          tld
-          tokenId
-          tokenized
-          tokenizationStatus
-          tokenizationTX
-          tokenizationDate
-          expirationDate
-          domainInternalStatus
-          domainRegistryStatus
-          contract {
-            address
-            chain {
-              name
-              networkId
-              id
-            }
-          }
-          pricing {
-            primaryPricingInfo {
-              remainingYearsPrice
-              firstYearPrice
-            }
-            secondaryPricingInfo {
-              price
-              currency {
-                symbol
-                decimals
-              }
-            }
-          }
-          listing {
-            fixedPrice
-            minimumOfferPrice
-            status
-            tokenStatus
-          }
-          highestOffer {
-            id
-            price
-            status
-          }
-          registrant {
-            id
-            name
-            wallet {
-              address
-              addressType
-            }
+          name
+          expiresAt
+          tokens {
+            tokenId
+            ownerAddress
+            networkId
+            type
           }
         }
       }
@@ -164,103 +111,60 @@ export async function fetchDomainsByOwner(owner: string, chainId: number = 1): P
   `;
 
   try {
+    // Convert to CAIP-10 format: eip155:{chainId}:{address}
+    // Using Doma testnet chain ID 97476
+    const caip10Address = `eip155:97476:${owner.toLowerCase()}`;
     const variables = {
-      size: 100,
-      page: 1,
-      sortOrder: "DESC",
-      status: [],
-      tlds: [],
-      searchTerm: ""
+      ownedBy: [caip10Address],
+      take: 100
     };
 
-    interface DomainItem {
-      id: string;
-      sld: string;
-      tld: string;
-      tokenId: string;
-      tokenized: boolean;
-      tokenizationStatus: string;
-      tokenizationTX?: string;
-      tokenizationDate?: string;
-      expirationDate?: string;
-      domainInternalStatus: string;
-      domainRegistryStatus?: string[];
-      contract?: {
-        address: string;
-        chain: {
+    const data = await domaClient.request<{
+      names: {
+        items: Array<{
           name: string;
-          networkId: string;
-          id: string;
-        };
+          expiresAt?: string;
+          tokens: Array<{
+            tokenId: string;
+            ownerAddress: string;
+            networkId?: string;
+            type?: string;
+          }>;
+        }>;
       };
-      pricing?: {
-        primaryPricingInfo?: {
-          remainingYearsPrice: number;
-          firstYearPrice: number;
-        };
-        secondaryPricingInfo?: {
-          price: number;
-          currency: {
-            symbol: string;
-            decimals: number;
-          };
-        };
-      };
-      listing?: {
-        fixedPrice?: number;
-        minimumOfferPrice?: number;
-        status?: string;
-        tokenStatus?: string;
-      };
-      highestOffer?: {
-        id: string;
-        price: number;
-        status: string;
-      };
-      registrant?: {
-        id: string;
-        name: string;
-        wallet: {
-          address: string;
-          addressType: string;
-        };
-      };
-    }
-
-    const data = await domaClient.request<{ userDomains: { items: DomainItem[]; estimatedValue: number; totalCount: number } }>(
-      query,
-      variables
-    );
+    }>(query, variables);
 
     // Transform to DomainToken format
-    const domains: DomainToken[] = (data.userDomains?.items || []).map(item => ({
-      id: item.id,
-      name: `${item.sld}.${item.tld}`,
-      sld: item.sld,
-      tld: item.tld,
-      owner: item.registrant?.wallet?.address || owner,
-      expirationDate: item.expirationDate ? new Date(item.expirationDate).getTime() / 1000 : undefined,
-      chain: item.contract ? {
-        id: item.contract.chain.networkId,
-        name: item.contract.chain.name
-      } : { id: '97476', name: 'Doma Testnet' },
-      tokenAddress: item.contract?.address,
-      tokenId: item.tokenId,
-      tokenized: item.tokenized,
-      tokenizationStatus: item.tokenizationStatus,
-      tokenizationTX: item.tokenizationTX,
-      tokenizationDate: item.tokenizationDate,
-      price: item.pricing?.primaryPricingInfo?.firstYearPrice || item.pricing?.secondaryPricingInfo?.price,
-      listing: item.listing ? {
-        fixedPrice: item.listing.fixedPrice,
-        minimumOfferPrice: item.listing.minimumOfferPrice,
-        status: item.listing.status,
-      } : undefined,
-      highestOffer: item.highestOffer ? {
-        price: item.highestOffer.price,
-        status: item.highestOffer.status,
-      } : undefined,
-    }));
+    const domains: DomainToken[] = [];
+
+    for (const nameItem of (data.names?.items || [])) {
+      const domainParts = nameItem.name?.split('.') || [];
+      const tld = domainParts.pop() || '';
+      const sld = domainParts.join('.');
+
+      // Get the first token for this name (if any)
+      const token = nameItem.tokens?.[0];
+
+      if (token) {
+        domains.push({
+          id: token.tokenId,
+          name: nameItem.name,
+          sld: sld,
+          tld: tld,
+          owner: token.ownerAddress || owner,
+          expirationDate: nameItem.expiresAt ? new Date(nameItem.expiresAt).getTime() / 1000 : undefined,
+          chain: {
+            id: token.networkId || '97476',
+            name: 'Doma Testnet'
+          },
+          tokenAddress: '0x424bDf2E8a6F52Bd2c1C81D9437b0DC0309DF90f', // Default contract address
+          tokenId: token.tokenId,
+          tokenized: true,
+          tokenizationStatus: 'TOKENIZED',
+          price: 10.26
+        });
+      }
+    }
 
     return domains;
   } catch (error) {

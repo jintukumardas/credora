@@ -11,6 +11,15 @@ import { parseEther, formatEther, parseUnits } from 'viem';
 import { CONTRACT_ADDRESSES } from './contract-addresses';
 import DomaFractionalizationABI from './abis/DomaFractionalization.json';
 
+interface FractionalizedDomain {
+  tokenId: string;
+  fractionalToken: string;
+  totalSupply: string;
+  minimumBuyoutPrice: string;
+  currentBuyoutPrice: string;
+  owner: string;
+}
+
 /**
  * Hook for fractionalizing a domain NFT
  */
@@ -23,7 +32,8 @@ export function useFractionalize() {
   const fractionalize = async (
     tokenId: string,
     tokenInfo: { name: string; symbol: string },
-    minimumBuyoutPriceUsdc: string
+    minimumBuyoutPriceUsdc: string,
+    totalSupplyTokens?: string
   ) => {
     if (!address) {
       throw new Error('Wallet not connected');
@@ -36,18 +46,27 @@ export function useFractionalize() {
       // Convert USDC to base units (6 decimals)
       const minimumBuyoutPrice = parseUnits(minimumBuyoutPriceUsdc, 6);
 
-      // Call contract
+      // Total supply: use provided value or default to 1,000,000 tokens with 18 decimals
+      const totalSupply = parseEther(totalSupplyTokens || '1000000');
+
+      // Launchpad address - use user's address as initial recipient
+      const launchpadAddress = address;
+
+      // Call contract with all required parameters
       const hash = await writeContractAsync({
         address: CONTRACT_ADDRESSES.DomaFractionalization as `0x${string}`,
         abi: DomaFractionalizationABI,
         functionName: 'fractionalizeOwnershipToken',
         args: [
-          BigInt(tokenId),
+          CONTRACT_ADDRESSES.DomaOwnershipToken as `0x${string}`, // tokenAddress
+          BigInt(tokenId), // tokenId
           {
             name: tokenInfo.name,
             symbol: tokenInfo.symbol,
-          },
-          minimumBuyoutPrice,
+          }, // fractionalTokenInfo
+          totalSupply, // totalSupply
+          minimumBuyoutPrice, // minimumBuyoutPrice
+          launchpadAddress, // launchpad (user receives tokens)
         ],
       });
 
@@ -178,7 +197,7 @@ export function useBuyoutPrice(tokenId: string | null) {
  * Hook for tracking fractionalized domains via events (simplified version)
  */
 export function useFractionalizedDomains(take: number = 20, skip: number = 0) {
-  const [domains, setDomains] = useState<any[]>([]);
+  const [domains, setDomains] = useState<FractionalizedDomain[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -210,8 +229,8 @@ export function useFractionalizedDomains(take: number = 20, skip: number = 0) {
  * Generate mock fractionalized domains for development
  * In production, this would query events or a subgraph
  */
-function generateMockFractionalizedDomains(count: number): any[] {
-  const mockDomains: any[] = [];
+function generateMockFractionalizedDomains(count: number): FractionalizedDomain[] {
+  const mockDomains: FractionalizedDomain[] = [];
 
   for (let i = 0; i < Math.min(count, 5); i++) {
     mockDomains.push({

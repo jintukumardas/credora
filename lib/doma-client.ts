@@ -83,42 +83,11 @@ export interface DomainMetadata {
   }[];
 }
 
-// Cache configuration
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
-const CACHE_KEY_PREFIX = 'doma_domains_cache_';
-
-interface CachedData {
-  data: DomainToken[];
-  timestamp: number;
-}
-
 /**
- * Fetch domain tokens owned by an address with 5-minute caching
+ * Fetch domain tokens owned by an address
  * Note: Doma API requires an API key - set NEXT_PUBLIC_DOMA_API_KEY in .env
  */
 export async function fetchDomainsByOwner(owner: string, chainId: number = 1): Promise<DomainToken[]> {
-  // Check if we're in a browser environment
-  if (typeof window !== 'undefined') {
-    const cacheKey = `${CACHE_KEY_PREFIX}${owner}`;
-
-    try {
-      // Try to get cached data
-      const cachedStr = sessionStorage.getItem(cacheKey);
-      if (cachedStr) {
-        const cached: CachedData = JSON.parse(cachedStr);
-        const now = Date.now();
-
-        // Check if cache is still valid (within 5 minutes)
-        if (now - cached.timestamp < CACHE_TTL) {
-          console.log('Using cached domain data');
-          return cached.data;
-        }
-      }
-    } catch (error) {
-      console.error('Error reading cache:', error);
-      // Continue with API call if cache read fails
-    }
-  }
   const query = `
     query userDomains($page: Int, $size: Int, $sortBy: String, $sortOrder: SortOrder, $status: [UserDomainStatusFilter!], $tlds: [Label!], $searchTerm: String) {
       userDomains(
@@ -293,23 +262,6 @@ export async function fetchDomainsByOwner(owner: string, chainId: number = 1): P
       } : undefined,
     }));
 
-    // Cache the data in sessionStorage if in browser
-    if (typeof window !== 'undefined') {
-      const cacheKey = `${CACHE_KEY_PREFIX}${owner}`;
-      const cacheData: CachedData = {
-        data: domains,
-        timestamp: Date.now(),
-      };
-
-      try {
-        sessionStorage.setItem(cacheKey, JSON.stringify(cacheData));
-        console.log('Domain data cached successfully');
-      } catch (error) {
-        console.error('Error caching domain data:', error);
-        // Continue without caching if storage fails
-      }
-    }
-
     return domains;
   } catch (error) {
     console.error('Error fetching domains:', error);
@@ -349,21 +301,6 @@ export async function fetchDomainsByOwner(owner: string, chainId: number = 1): P
         price: 10.26,
       },
     ];
-
-    // Cache fallback data too
-    if (typeof window !== 'undefined') {
-      const cacheKey = `${CACHE_KEY_PREFIX}${owner}`;
-      const cacheData: CachedData = {
-        data: fallbackDomains,
-        timestamp: Date.now(),
-      };
-
-      try {
-        sessionStorage.setItem(cacheKey, JSON.stringify(cacheData));
-      } catch (cacheError) {
-        console.error('Error caching fallback data:', cacheError);
-      }
-    }
 
     return fallbackDomains;
   }

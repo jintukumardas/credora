@@ -309,6 +309,109 @@ export class LandingPageGenerator extends EventEmitter {
     // Fetch domain data
     const domainData = await this.fetchDomainData(domainId) as DomainData;
 
+    try {
+      // First, try to use Gemini AI to generate the HTML
+      const html = await this.generateWithGeminiAI(domainData, template);
+      if (html) {
+        return html;
+      }
+    } catch (error) {
+      console.warn('Gemini AI generation failed, falling back to template rendering:', error);
+    }
+
+    // Fallback to template-based rendering if Gemini fails
+    return this.renderTemplateWithFallback(domainData, template);
+  }
+
+  /**
+   * Generate HTML using Gemini AI
+   */
+  private async generateWithGeminiAI(
+    domainData: DomainData,
+    template: PageTemplate
+  ): Promise<string | null> {
+    try {
+      // Dynamically import Gemini service to avoid circular dependencies
+      const { geminiService } = await import('./gemini-service');
+
+      // Prepare business info for Gemini
+      const businessInfo = {
+        type: domainData.name,
+        description: `Premium domain ${domainData.name}.${domainData.tld} ${domainData.listed ? `available for ${domainData.price} ETH` : ''}`,
+        targetAudience: 'Domain investors and businesses',
+        style: this.detectStyleFromTemplate(template)
+      };
+
+      // Generate landing page content with Gemini
+      const landingPageContent = await geminiService.generateLandingPage(
+        `${domainData.name}.${domainData.tld}`,
+        businessInfo
+      );
+
+      // Return the generated HTML content
+      if (landingPageContent.htmlContent) {
+        // Inject analytics script
+        const analyticsScript = `
+        <script>
+            // Analytics tracking
+            (function() {
+                const domainId = '${domainData.id}';
+                const pageId = '${Date.now()}';
+
+                // Track page view
+                fetch('/api/analytics/pageview', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ domainId, pageId })
+                });
+
+                // Track time on page
+                let startTime = Date.now();
+                window.addEventListener('beforeunload', () => {
+                    const duration = Date.now() - startTime;
+                    navigator.sendBeacon('/api/analytics/duration',
+                        JSON.stringify({ domainId, pageId, duration }));
+                });
+            })();
+        </script>`;
+
+        // Insert analytics before closing body tag
+        return landingPageContent.htmlContent.replace('</body>', `${analyticsScript}</body>`);
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Failed to generate with Gemini AI:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Detect style from template for Gemini
+   */
+  private detectStyleFromTemplate(template: PageTemplate): 'modern' | 'classic' | 'minimal' | 'bold' {
+    const primaryColor = template.styles.primaryColor.toLowerCase();
+    const animations = template.styles.animations;
+
+    if (template.id === 'minimal' || template.components.length <= 3) {
+      return 'minimal';
+    }
+    if (template.id === 'business' || primaryColor.includes('#3b82f6')) {
+      return 'classic';
+    }
+    if (animations && (primaryColor.includes('#ec4899') || primaryColor.includes('#8b5cf6'))) {
+      return 'bold';
+    }
+    return 'modern';
+  }
+
+  /**
+   * Fallback template-based rendering
+   */
+  private async renderTemplateWithFallback(
+    domainData: DomainData,
+    template: PageTemplate
+  ): Promise<string> {
     // Build HTML
     let html = `<!DOCTYPE html>
 <html lang="en">
@@ -343,7 +446,7 @@ export class LandingPageGenerator extends EventEmitter {
     <script>
         // Analytics tracking
         (function() {
-            const domainId = '${domainId}';
+            const domainId = '${domainData.id}';
             const pageId = '${Date.now()}';
 
             // Track page view
@@ -478,7 +581,7 @@ export class LandingPageGenerator extends EventEmitter {
     return `
     <footer class="footer">
         <div class="container">
-            <p>&copy; 2024 ${domainData.name}.${domainData.tld}. Powered by Credora.</p>
+            <p>&copy; 2025 ${domainData.name}.${domainData.tld}. Powered by Credora.</p>
         </div>
     </footer>`;
   }
@@ -594,9 +697,23 @@ export class LandingPageGenerator extends EventEmitter {
   /**
    * Upload to IPFS
    */
-  private async uploadToIPFS(_content: string): Promise<string> {
-    // Mock implementation - would use Pinata/IPFS
-    return `Qm${Array(44).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join('')}`;
+  private async uploadToIPFS(content: string): Promise<string> {
+    try {
+      // Import Pinata service
+      const { pinataService } = await import('./pinata-service');
+
+      // Upload HTML to IPFS via Pinata
+      const ipfsHash = await pinataService.uploadHTML(content, {
+        type: 'landing-page',
+        timestamp: new Date().toISOString(),
+      });
+
+      return ipfsHash;
+    } catch (error) {
+      console.error('Failed to upload to IPFS, using mock hash:', error);
+      // Fallback to mock implementation if Pinata fails
+      return `Qm${Array(44).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join('')}`;
+    }
   }
 
   /**

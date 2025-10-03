@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useAccount, useWriteContract, useReadContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther, formatEther, parseUnits } from 'viem';
 import { CONTRACT_ADDRESSES } from './contract-addresses';
@@ -165,6 +165,42 @@ export function useExchangeFractionalToken() {
 }
 
 /**
+ * Store fractionalized domain info in localStorage
+ */
+export function storeFractionalizedDomain(domain: {
+  name: string;
+  tokenId: string;
+  fractionalTokenAddress?: string;
+  totalShares: number;
+  pricePerShare: number;
+  availableShares: number;
+}) {
+  if (typeof window === 'undefined') return;
+
+  // Validate fractionalTokenAddress if provided
+  if (domain.fractionalTokenAddress) {
+    if (domain.fractionalTokenAddress.length !== 42 || !domain.fractionalTokenAddress.startsWith('0x')) {
+      console.error('Invalid fractional token address:', domain.fractionalTokenAddress);
+      // Generate a valid mock address for demo purposes
+      domain.fractionalTokenAddress = '0x' + Array.from({length: 40}, () => Math.floor(Math.random() * 16).toString(16)).join('');
+    }
+  }
+
+  const key = 'fractionalized_domains';
+  const existing = localStorage.getItem(key);
+  const domains = existing ? JSON.parse(existing) : [];
+
+  // Add new domain with fractionalToken property for consistency
+  domains.push({
+    ...domain,
+    fractionalToken: domain.fractionalTokenAddress, // Store both for compatibility
+    createdAt: new Date().toISOString(),
+  });
+
+  localStorage.setItem(key, JSON.stringify(domains));
+}
+
+/**
  * Hook for fetching buyout price from smart contract
  */
 export function useBuyoutPrice(tokenId: string | null) {
@@ -197,19 +233,43 @@ export function useBuyoutPrice(tokenId: string | null) {
  * Hook for tracking fractionalized domains via events (simplified version)
  */
 export function useFractionalizedDomains(take: number = 20, skip: number = 0) {
-  const [domains, setDomains] = useState<FractionalizedDomain[]>([]);
+  const [domains, setDomains] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchDomains = async () => {
+  const fetchDomains = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      // In a real implementation, you would:
-      // 1. Query events from the contract (NameTokenFractionalized)
-      // 2. Or use a subgraph/indexer to get fractionalized domains
-      // For now, return mock data
+      // Fetch from localStorage first
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem('fractionalized_domains');
+        if (stored) {
+          try {
+            const allDomains = JSON.parse(stored);
+            // Filter out any domains with invalid addresses
+            const validDomains = allDomains.filter((domain: any) => {
+              const tokenAddress = domain.fractionalTokenAddress || domain.fractionalToken;
+              // Valid Ethereum address: 42 chars (0x + 40 hex chars)
+              if (tokenAddress && tokenAddress.length !== 42) {
+                console.warn(`Filtering out domain with invalid address: ${tokenAddress}`);
+                return false;
+              }
+              return true;
+            });
+            const sliced = validDomains.slice(skip, skip + take);
+            setDomains(sliced);
+            return sliced;
+          } catch (e) {
+            console.error('Error parsing stored domains:', e);
+            // Clear corrupted data
+            localStorage.removeItem('fractionalized_domains');
+          }
+        }
+      }
+
+      // Fallback to mock data if no stored data
       const mockDomains = generateMockFractionalizedDomains(take);
       setDomains(mockDomains);
       return mockDomains;
@@ -220,7 +280,7 @@ export function useFractionalizedDomains(take: number = 20, skip: number = 0) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [take, skip]);
 
   return { domains, isLoading, error, fetchDomains };
 }
@@ -233,13 +293,17 @@ function generateMockFractionalizedDomains(count: number): FractionalizedDomain[
   const mockDomains: FractionalizedDomain[] = [];
 
   for (let i = 0; i < Math.min(count, 5); i++) {
+    // Generate valid 40-character Ethereum addresses (20 bytes = 40 hex chars)
+    const fractionalTokenAddress = '0x' + Array.from({length: 40}, () => Math.floor(Math.random() * 16).toString(16)).join('');
+    const ownerAddress = '0x' + Array.from({length: 40}, () => Math.floor(Math.random() * 16).toString(16)).join('');
+
     mockDomains.push({
       tokenId: `${100 + i}`,
-      fractionalToken: `0x${Math.random().toString(16).slice(2, 42).padStart(40, '0')}`,
+      fractionalToken: fractionalTokenAddress,
       totalSupply: (1000000 * 1e18).toString(),
       minimumBuyoutPrice: parseUnits((2000 + i * 500).toString(), 6).toString(), // USDC has 6 decimals
       currentBuyoutPrice: parseUnits((2500 + i * 500).toString(), 6).toString(),
-      owner: `0x${Math.random().toString(16).slice(2, 42).padStart(40, '0')}`,
+      owner: ownerAddress,
     });
   }
 

@@ -18,11 +18,12 @@ export interface TrendingDomain {
 
 class AITrendingService {
   private genAI: GoogleGenerativeAI | null = null;
+  private modelName = 'gemini-2.5-flash';
 
   constructor() {
     // Initialize Google AI if API key is available
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_AI_API_KEY;
-    if (apiKey) {
+    if (apiKey && apiKey !== 'your_google_ai_api_key_here' && apiKey !== '') {
       this.genAI = new GoogleGenerativeAI(apiKey);
     }
   }
@@ -37,7 +38,7 @@ class AITrendingService {
     }
 
     try {
-      const model = this.genAI.getGenerativeModel({ model: 'gemini-pro' });
+      const model = this.genAI.getGenerativeModel({ model: this.modelName });
 
       const prompt = `
         Analyze current market trends and generate ${limit} trending domain names that would be valuable in today's market.
@@ -123,7 +124,7 @@ class AITrendingService {
     }
 
     try {
-      const model = this.genAI.getGenerativeModel({ model: 'gemini-pro' });
+      const model = this.genAI.getGenerativeModel({ model: this.modelName });
 
       const prompt = `
         Analyze the domain "${name}.${tld}" and provide:
@@ -179,20 +180,11 @@ class AITrendingService {
     insights: string[];
   }> {
     if (!this.genAI) {
-      return {
-        hotCategories: ['AI', 'Web3', 'Gaming', 'Finance'],
-        risingKeywords: ['ai', 'crypto', 'meta', 'quantum'],
-        priceMovers: [
-          { domain: 'ai.com', change: 25.5 },
-          { domain: 'crypto.io', change: 18.3 },
-        ],
-        marketSentiment: 'bullish',
-        insights: ['Configure Google AI for real-time insights'],
-      };
+      return this.getDefaultMarketInsights();
     }
 
     try {
-      const model = this.genAI.getGenerativeModel({ model: 'gemini-pro' });
+      const model = this.genAI.getGenerativeModel({ model: this.modelName });
 
       const prompt = `
         Analyze the current domain name market and provide insights:

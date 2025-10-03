@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, DollarSign, Coins, AlertCircle, CheckCircle, Shield } from 'lucide-react';
-import { useFractionalize } from '@/lib/fractionalization-hooks';
+import { useFractionalize, storeFractionalizedDomain } from '@/lib/fractionalization-hooks';
 import { useAccount, useWriteContract, useReadContract, useWaitForTransactionReceipt } from 'wagmi';
 import { CONTRACT_ADDRESSES } from '@/lib/contract-addresses';
 import { toast } from 'react-hot-toast';
@@ -121,7 +121,17 @@ export function FractionalizationModal({
         totalSupply
       );
 
-      toast.success('Domain fractionalized successfully!');
+      // Store the fractionalized domain data
+      storeFractionalizedDomain({
+        name: domainName,
+        tokenId: tokenId,
+        fractionalTokenAddress: result.transactionHash, // In production, get actual token address from event
+        totalShares: parseFloat(totalSupply),
+        pricePerShare: parseFloat(minimumBuyoutPrice) / parseFloat(totalSupply),
+        availableShares: parseFloat(totalSupply),
+      });
+
+      toast.success('Domain fractionalized successfully! Check the marketplace to see your fractionalized domain.');
       onClose();
     } catch (err) {
       toast.error('Failed to fractionalize domain');

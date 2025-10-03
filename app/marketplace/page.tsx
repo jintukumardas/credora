@@ -3,43 +3,67 @@
 import { Header } from '@/components/Header';
 import { motion } from 'framer-motion';
 import { useState, useEffect } from 'react';
-import { Search, TrendingUp, Filter, ShoppingCart, Tag, ExternalLink } from 'lucide-react';
-import { fetchTrendingDomains, fetchListings, DomaName, DomaListing } from '@/lib/doma-api';
+import { Search, Filter, Sparkles, Coins } from 'lucide-react';
+import { aiTrendingService, TrendingDomain } from '@/lib/ai-trending-service';
+import { useAppStore } from '@/lib/store';
 import Link from 'next/link';
 
 export default function MarketplacePage() {
-  const [trendingDomains, setTrendingDomains] = useState<DomaName[]>([]);
-  const [listings, setListings] = useState<DomaListing[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'trending' | 'listings'>('trending');
+  const [aiTrendingDomains, setAiTrendingDomains] = useState<TrendingDomain[]>([]);
+  const [marketInsights, setMarketInsights] = useState<{
+    hotCategories: string[];
+    risingKeywords: string[];
+    priceMovers: { domain: string; change: number }[];
+    marketSentiment: 'bullish' | 'bearish' | 'neutral';
+    insights: string[];
+  } | null>(null);
+  const { addNotification } = useAppStore();
 
+  // Fetch AI-powered trending domains and market insights
   useEffect(() => {
-    loadMarketplaceData();
+    const fetchTrendingData = async () => {
+      setLoading(true);
+      try {
+        // Fetch trending domains using AI
+        const trending = await aiTrendingService.getTrendingDomains(10);
+        setAiTrendingDomains(trending);
+
+        // Fetch market insights
+        const insights = await aiTrendingService.getMarketInsights();
+        setMarketInsights(insights);
+
+        // Add notification for market update
+        addNotification({
+          type: 'info',
+          title: 'Market Data Updated',
+          message: `Market sentiment: ${insights.marketSentiment}`,
+        });
+      } catch (error) {
+        console.error('Failed to fetch trending data:', error);
+        // Use fallback data if AI fails
+        const fallbackData = [
+          { name: 'crypto', tld: 'xyz', price: 5000, change: 12.5, volume24h: 75000, category: 'Crypto', aiScore: 85, reason: 'High demand' },
+          { name: 'defi', tld: 'io', price: 3500, change: 8.3, volume24h: 52000, category: 'DeFi', aiScore: 78, reason: 'DeFi growth' },
+          { name: 'nft', tld: 'eth', price: 4200, change: -3.2, volume24h: 63000, category: 'NFT', aiScore: 72, reason: 'NFT market activity' },
+          { name: 'meta', tld: 'com', price: 15000, change: 25.7, volume24h: 225000, category: 'Tech', aiScore: 95, reason: 'Metaverse boom' },
+          { name: 'web3', tld: 'dao', price: 2800, change: 5.1, volume24h: 42000, category: 'Web3', aiScore: 69, reason: 'Web3 adoption' },
+        ];
+        setAiTrendingDomains(fallbackData);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTrendingData();
+    // Refresh trending data every 5 minutes
+    const interval = setInterval(fetchTrendingData, 5 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
-  const loadMarketplaceData = async () => {
-    setLoading(true);
-    try {
-      const [trending, marketListings] = await Promise.all([
-        fetchTrendingDomains(20),
-        fetchListings(20),
-      ]);
-      setTrendingDomains(trending);
-      setListings(marketListings);
-    } catch (error) {
-      console.error('Error loading marketplace data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filteredDomains = trendingDomains.filter((domain) =>
+  const filteredDomains = aiTrendingDomains.filter((domain) =>
     domain.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const filteredListings = listings.filter((listing) =>
-    listing.id?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -53,10 +77,21 @@ export default function MarketplacePage() {
         >
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-4xl font-bold mb-2">Domain Marketplace</h1>
-            <p className="text-gray-400">
-              Discover, trade, and invest in tokenized domains
-            </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-4xl font-bold mb-2">Domain Marketplace</h1>
+                <p className="text-gray-400">
+                  Discover, trade, and invest in tokenized domains
+                </p>
+              </div>
+              <Link
+                href="/marketplace/fractionalized"
+                className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg font-medium hover:opacity-90 transition-opacity flex items-center gap-2"
+              >
+                <Coins className="w-5 h-5" />
+                Fractionalized Domains
+              </Link>
+            </div>
           </div>
 
           {/* Search and Filters */}
@@ -77,34 +112,12 @@ export default function MarketplacePage() {
             </button>
           </div>
 
-          {/* Tabs */}
-          <div className="flex gap-4 mb-6 border-b border-[var(--border)]">
-            <button
-              onClick={() => setActiveTab('trending')}
-              className={`pb-3 px-4 font-medium transition-colors ${
-                activeTab === 'trending'
-                  ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4" />
-                Trending Domains
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('listings')}
-              className={`pb-3 px-4 font-medium transition-colors ${
-                activeTab === 'listings'
-                  ? 'text-[var(--primary)] border-b-2 border-[var(--primary)]'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <ShoppingCart className="w-4 h-4" />
-                Buy Now Listings
-              </div>
-            </button>
+          {/* AI-Powered Trending Header */}
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              <Sparkles className="w-6 h-6 text-[var(--primary)]" />
+              AI-Powered Trending Domains
+            </h2>
           </div>
 
           {/* Loading State */}
@@ -115,152 +128,98 @@ export default function MarketplacePage() {
             </div>
           )}
 
-          {/* Trending Domains */}
-          {!loading && activeTab === 'trending' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredDomains.length === 0 ? (
-                <div className="col-span-full text-center py-12 text-gray-400">
-                  No domains found
+          {/* AI-Powered Trending Domains */}
+          {!loading && (
+            <div>
+              {marketInsights && (
+                <div className="mb-6 flex items-center gap-4">
+                  <h3 className="text-xl font-semibold">Market Sentiment:</h3>
+                  <span className={`text-sm px-3 py-1 rounded-full ${
+                    marketInsights.marketSentiment === 'bullish' ? 'bg-green-500/20 text-green-400' :
+                    marketInsights.marketSentiment === 'bearish' ? 'bg-red-500/20 text-red-400' :
+                    'bg-gray-500/20 text-gray-400'
+                  }`}>
+                    {marketInsights.marketSentiment} market
+                  </span>
                 </div>
-              ) : (
-                filteredDomains.map((domain) => (
-                  <DomainCard key={domain.id} domain={domain} />
-                ))
               )}
-            </div>
-          )}
+              <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-4">
+                {filteredDomains.map((domain, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl p-4 hover:border-[var(--primary)] transition-all hover:shadow-lg cursor-pointer group"
+                    onClick={() => {
+                      // Redirect to Interstellar search with domain
+                      const domainName = `${domain.name}.${domain.tld}`;
+                      window.open(`https://testnet.interstellar.xyz/search?query=${encodeURIComponent(domainName)}&partner=com&type=web2`, '_blank');
+                    }}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs text-gray-400">#{index + 1}</span>
+                        <div className="w-12 h-1 bg-gradient-to-r from-[var(--primary)] to-[var(--secondary)] rounded-full"
+                             style={{ width: `${(domain.aiScore / 100) * 48}px` }} />
+                        <span className="text-xs text-[var(--primary)]">{domain.aiScore}</span>
+                      </div>
+                      <span className={`text-sm font-medium ${domain.change > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {domain.change > 0 ? '+' : ''}{domain.change}%
+                      </span>
+                    </div>
+                    <h3 className="font-semibold text-lg mb-1">{domain.name}.{domain.tld}</h3>
+                    <p className="text-xl font-bold text-[var(--primary)] mb-2">${domain.price.toLocaleString()}</p>
+                    <div className="text-xs text-gray-400 mb-2">
+                      Vol: ${(domain.volume24h / 1000).toFixed(0)}k
+                    </div>
+                    <p className="text-xs text-gray-500 group-hover:text-gray-300 transition-colors line-clamp-2">
+                      {domain.reason}
+                    </p>
+                    <span className="inline-block mt-2 text-xs px-2 py-1 bg-[var(--primary)]/10 text-[var(--primary)] rounded">
+                      {domain.category}
+                    </span>
+                  </motion.div>
+                ))}
+              </div>
 
-          {/* Listings */}
-          {!loading && activeTab === 'listings' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredListings.length === 0 ? (
-                <div className="col-span-full text-center py-12 text-gray-400">
-                  No listings available
+              {/* Market Insights */}
+              {marketInsights && (
+                <div className="mt-6 grid md:grid-cols-3 gap-4">
+                  <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-lg p-4">
+                    <h4 className="text-sm text-gray-400 mb-2">Hot Categories</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {marketInsights.hotCategories?.map((cat: string, i: number) => (
+                        <span key={i} className="text-xs px-2 py-1 bg-purple-500/20 text-purple-400 rounded">
+                          {cat}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-lg p-4">
+                    <h4 className="text-sm text-gray-400 mb-2">Rising Keywords</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {marketInsights.risingKeywords?.map((kw: string, i: number) => (
+                        <span key={i} className="text-xs px-2 py-1 bg-blue-500/20 text-blue-400 rounded">
+                          {kw}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-lg p-4">
+                    <h4 className="text-sm text-gray-400 mb-2">Market Insight</h4>
+                    <p className="text-xs text-gray-300">
+                      {marketInsights.insights?.[0]}
+                    </p>
+                  </div>
                 </div>
-              ) : (
-                filteredListings.map((listing) => (
-                  <ListingCard key={listing.id} listing={listing} />
-                ))
               )}
             </div>
           )}
         </motion.div>
       </main>
     </>
-  );
-}
-
-function DomainCard({ domain }: { domain: DomaName }) {
-  const token = domain.tokens?.[0];
-  const expiresAt = domain.expiresAt ? new Date(domain.expiresAt) : null;
-  const isExpiringSoon = expiresAt && expiresAt.getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000;
-
-  return (
-    <motion.div
-      whileHover={{ y: -4 }}
-      className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl p-6 hover:border-[var(--primary)] transition-colors"
-    >
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex-1">
-          <h3 className="text-xl font-bold mb-1 truncate">{domain.name}</h3>
-          <p className="text-sm text-gray-400">
-            {domain.network || 'Unknown Network'}
-          </p>
-        </div>
-        {isExpiringSoon && (
-          <span className="bg-yellow-500/10 text-yellow-500 text-xs px-2 py-1 rounded">
-            Expiring Soon
-          </span>
-        )}
-      </div>
-
-      <div className="space-y-2 mb-4">
-        {token && (
-          <div className="text-sm">
-            <span className="text-gray-400">Token ID:</span>{' '}
-            <span className="font-mono">{token.tokenId}</span>
-          </div>
-        )}
-        {expiresAt && (
-          <div className="text-sm">
-            <span className="text-gray-400">Expires:</span>{' '}
-            <span>{expiresAt.toLocaleDateString()}</span>
-          </div>
-        )}
-        {domain.registrar && (
-          <div className="text-sm">
-            <span className="text-gray-400">Registrar:</span>{' '}
-            <span>{domain.registrar.name}</span>
-          </div>
-        )}
-      </div>
-
-      <div className="flex gap-2">
-        <Link
-          href={`/marketplace/${encodeURIComponent(domain.name)}`}
-          className="flex-1 bg-gradient-to-r from-[var(--primary)] to-[var(--secondary)] text-white py-2 rounded-lg font-medium hover:opacity-90 transition-opacity text-center"
-        >
-          View Details
-        </Link>
-        <button className="bg-[var(--background)] border border-[var(--border)] px-4 py-2 rounded-lg hover:bg-[var(--card-bg)]">
-          <Tag className="w-4 h-4" />
-        </button>
-      </div>
-    </motion.div>
-  );
-}
-
-function ListingCard({ listing }: { listing: DomaListing }) {
-  const domainName = listing.token?.name?.name || 'Unknown Domain';
-  const price = parseFloat(listing.price || '0');
-
-  return (
-    <motion.div
-      whileHover={{ y: -4 }}
-      className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl p-6 hover:border-[var(--primary)] transition-colors"
-    >
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex-1">
-          <h3 className="text-xl font-bold mb-1 truncate">{domainName}</h3>
-          <p className="text-sm text-gray-400">
-            Listed by {listing.seller?.slice(0, 6) || listing.offererAddress.slice(0, 6)}...{listing.seller?.slice(-4) || listing.offererAddress.slice(-4)}
-          </p>
-        </div>
-        <span className="bg-green-500/10 text-green-500 text-xs px-2 py-1 rounded">
-          {listing.status || 'Active'}
-        </span>
-      </div>
-
-      <div className="mb-4">
-        <div className="text-sm text-gray-400 mb-1">Price</div>
-        <div className="text-2xl font-bold text-[var(--primary)]">
-          {price > 0 ? `$${price.toFixed(2)}` : 'Make Offer'}
-        </div>
-        <div className="text-xs text-gray-500">{listing.currency || 'USDC'}</div>
-      </div>
-
-      <div className="space-y-2 mb-4">
-        <div className="text-sm">
-          <span className="text-gray-400">Token ID:</span>{' '}
-          <span className="font-mono">{listing.token?.tokenId}</span>
-        </div>
-        <div className="text-sm">
-          <span className="text-gray-400">Listed:</span>{' '}
-          <span>{new Date(listing.createdAt).toLocaleDateString()}</span>
-        </div>
-      </div>
-
-      <div className="flex gap-2">
-        <Link
-          href={`/marketplace/${encodeURIComponent(domainName)}`}
-          className="flex-1 bg-gradient-to-r from-[var(--primary)] to-[var(--secondary)] text-white py-2 rounded-lg font-medium hover:opacity-90 transition-opacity text-center"
-        >
-          Buy Now
-        </Link>
-        <button className="bg-[var(--background)] border border-[var(--border)] px-4 py-2 rounded-lg hover:bg-[var(--card-bg)]">
-          <ExternalLink className="w-4 h-4" />
-        </button>
-      </div>
-    </motion.div>
   );
 }

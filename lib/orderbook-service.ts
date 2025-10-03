@@ -20,8 +20,10 @@ export const DOMA_TESTNET_CAIP2: Caip2ChainId = 'eip155:91144';
  */
 export function initializeOrderbookClient(): DomaOrderbookSDK {
   const config = {
-    apiKey: process.env.NEXT_PUBLIC_DOMA_API_KEY || '',
-    apiUrl: process.env.NEXT_PUBLIC_DOMA_API_URL || 'https://api-testnet.doma.xyz',
+    apiClientOptions: {
+      baseUrl: process.env.NEXT_PUBLIC_DOMA_API_URL || 'https://api-testnet.doma.xyz',
+      apiKey: process.env.NEXT_PUBLIC_DOMA_API_KEY || '',
+    },
   };
 
   return createDomaOrderbookClient(config);
@@ -95,9 +97,15 @@ export async function buyDomainListing(params: {
 }) {
   const client = initializeOrderbookClient();
   const signer = await getEthersSigner(params.walletClient);
+  const address = params.walletClient.account?.address;
+
+  if (!address) {
+    throw new Error('Wallet address not found');
+  }
 
   const buyParams: BuyListingParams = {
     orderId: params.orderId,
+    fulFillerAddress: address,
   };
 
   let progress = '';

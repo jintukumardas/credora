@@ -108,7 +108,9 @@ export default function LendingPage() {
     if (storedDomain) {
       const domain = JSON.parse(storedDomain);
       setSelectedDomain(domain);
-      setDomainValue(estimateDomainValue(domain));
+      // Use actual domain price if available, otherwise estimate
+      const value = domain.price ? domain.price : estimateDomainValue(domain);
+      setDomainValue(value);
     }
 
     // Debug: Log contract addresses
@@ -511,7 +513,11 @@ export default function LendingPage() {
                     />
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
-                    {selectedDomain && `Estimated value: $${estimateDomainValue(selectedDomain).toFixed(2)} (you can adjust)`}
+                    {selectedDomain && (
+                      selectedDomain.price
+                        ? `Domain value: $${selectedDomain.price.toFixed(2)} (you can adjust)`
+                        : `Estimated value: $${estimateDomainValue(selectedDomain).toFixed(2)} (you can adjust)`
+                    )}
                   </p>
                 </div>
 

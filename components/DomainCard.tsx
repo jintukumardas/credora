@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Globe, Calendar, TrendingUp } from 'lucide-react';
+import { Globe, Calendar, TrendingUp, CheckCircle, DollarSign, Link2, Tag } from 'lucide-react';
 import { DomainToken } from '@/lib/doma-client';
 import { formatExpirationDate, daysUntilExpiration, estimateDomainValue } from '@/lib/doma-client';
 
@@ -13,7 +13,7 @@ interface DomainCardProps {
 
 export function DomainCard({ domain, onBorrow, onLease }: DomainCardProps) {
   const daysLeft = domain.expirationDate ? daysUntilExpiration(domain.expirationDate) : 365;
-  const estimatedValue = estimateDomainValue(domain);
+  const estimatedValue = domain.price ? domain.price : estimateDomainValue(domain);
 
   return (
     <motion.div
@@ -27,13 +27,47 @@ export function DomainCard({ domain, onBorrow, onLease }: DomainCardProps) {
           </div>
           <div>
             <h3 className="text-lg font-semibold text-white">{domain.name}</h3>
-            <p className="text-sm text-gray-400">Token</p>
+            <div className="flex items-center gap-2 mt-1">
+              {domain.tokenized && (
+                <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-green-500/20 text-green-400 rounded">
+                  <CheckCircle className="w-3 h-3" />
+                  Tokenized
+                </span>
+              )}
+              {domain.listing?.status && (
+                <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded">
+                  <Tag className="w-3 h-3" />
+                  Listed
+                </span>
+              )}
+            </div>
           </div>
         </div>
+        {domain.chain && (
+          <div className="text-xs text-gray-500">
+            <Link2 className="w-3 h-3 inline mr-1" />
+            {domain.chain.name}
+          </div>
+        )}
       </div>
 
-      <div className="text-xs text-gray-500 mb-4 font-mono break-all">
-        #{domain.tokenId || 'N/A'}
+      <div className="space-y-1 mb-4">
+        <div className="text-xs text-gray-500 font-mono break-all">
+          Token: #{domain.tokenId ? `${domain.tokenId.slice(0, 8)}...${domain.tokenId.slice(-6)}` : 'N/A'}
+        </div>
+        {domain.tokenizationTX && (
+          <div className="text-xs text-gray-500">
+            TX:
+            <a
+              href={`https://explorer-testnet.doma.xyz/tx/${domain.tokenizationTX}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[var(--primary)] hover:underline ml-1"
+            >
+              {domain.tokenizationTX.slice(0, 8)}...{domain.tokenizationTX.slice(-6)}
+            </a>
+          </div>
+        )}
       </div>
 
       <div className="space-y-3 mb-4">
@@ -64,11 +98,29 @@ export function DomainCard({ domain, onBorrow, onLease }: DomainCardProps) {
 
         <div className="flex items-center justify-between text-sm">
           <span className="text-gray-400 flex items-center gap-2">
-            <TrendingUp className="w-4 h-4" />
-            Est. Value
+            <DollarSign className="w-4 h-4" />
+            {domain.price ? 'Price' : 'Est. Value'}
           </span>
           <span className="text-white font-medium">${estimatedValue.toLocaleString()}</span>
         </div>
+
+        {domain.listing?.fixedPrice && (
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-400">Listed Price</span>
+            <span className="text-[var(--primary)] font-medium">
+              ${domain.listing.fixedPrice.toLocaleString()}
+            </span>
+          </div>
+        )}
+
+        {domain.highestOffer?.price && (
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-400">Best Offer</span>
+            <span className="text-green-400 font-medium">
+              ${domain.highestOffer.price.toLocaleString()}
+            </span>
+          </div>
+        )}
 
         <div className="flex items-center justify-between text-sm">
           <span className="text-gray-400">Owner</span>

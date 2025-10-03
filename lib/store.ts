@@ -100,6 +100,15 @@ interface Notification {
   message: string;
   timestamp: Date;
   read: boolean;
+  metadata?: {
+    sender?: string;
+    domainContext?: string;
+    ipfsHash?: string;
+    actionUrl?: string;
+    uniqueKey?: string;
+    timestamp?: string;
+    [key: string]: any;
+  };
 }
 
 // Combined Store State
@@ -172,7 +181,7 @@ export const useAppStore = create<AppState>()(
           activeLeases: [],
           fractionalizedDomains: [],
           portfolioValue: 0,
-          notifications: [],
+          notifications: [] as Notification[],
         },
         marketplace: {
           listedDomains: [],
@@ -363,16 +372,26 @@ export const useAppStore = create<AppState>()(
 
         // Notifications
         addNotification: (notification) => {
+          // Use a more unique ID combining timestamp, random number, and metadata
+          const uniqueId = notification.metadata?.uniqueKey ||
+                          `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
           const newNotification: Notification = {
             ...notification,
-            id: `notif-${Date.now()}`,
+            id: uniqueId,
             timestamp: new Date(),
             read: false,
           };
+
+          // Check if notification with same ID already exists
+          const currentNotifications = get().user.notifications || [];
+          if (currentNotifications.some(n => n.id === uniqueId)) {
+            return; // Skip duplicate
+          }
+
           set((state) => ({
             user: {
               ...state.user,
-              notifications: [newNotification, ...state.user.notifications],
+              notifications: [newNotification, ...currentNotifications],
             },
           }));
         },
@@ -381,7 +400,7 @@ export const useAppStore = create<AppState>()(
           set((state) => ({
             user: {
               ...state.user,
-              notifications: state.user.notifications.map((n) =>
+              notifications: (state.user.notifications || []).map((n) =>
                 n.id === id ? { ...n, read: true } : n
               ),
             },

@@ -11,7 +11,10 @@ import {
   DollarSign,
   BarChart3,
   ShoppingCart,
-  Eye
+  Eye,
+  Sparkles,
+  Tag,
+  Coins
 } from 'lucide-react';
 import { domainService, Domain } from '@/lib/domain-service';
 import {
@@ -21,6 +24,9 @@ import {
 } from '@/lib/orderbook-service';
 import { useWalletClient } from 'wagmi';
 import toast from 'react-hot-toast';
+import { aiTrendingService, TrendingDomain } from '@/lib/ai-trending-service';
+import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 
 interface MarketplaceProps {
   initialDomains?: Domain[];
@@ -29,7 +35,9 @@ interface MarketplaceProps {
 export function DomainMarketplace({ initialDomains = [] }: MarketplaceProps) {
   const { isConnected } = useAccount();
   const { data: walletClient } = useWalletClient();
+  const searchParams = useSearchParams();
   const [domains, setDomains] = useState<Domain[]>(initialDomains);
+  const [trendingDomains, setTrendingDomains] = useState<TrendingDomain[]>([]);
   const [selectedDomain, setSelectedDomain] = useState<Domain | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState<{
@@ -49,6 +57,36 @@ export function DomainMarketplace({ initialDomains = [] }: MarketplaceProps) {
   const [showOfferModal, setShowOfferModal] = useState(false);
   const [listingPrice, setListingPrice] = useState('');
   const [offerPrice, setOfferPrice] = useState('');
+  const [activeTab, setActiveTab] = useState<'all' | 'trending'>('all');
+
+  // Check for view param and trending domain from dashboard
+  useEffect(() => {
+    const view = searchParams.get('view');
+    if (view === 'trending') {
+      setActiveTab('trending');
+
+      // Load trending domain from session
+      const selectedTrending = sessionStorage.getItem('selectedTrendingDomain');
+      if (selectedTrending) {
+        const domain = JSON.parse(selectedTrending);
+        sessionStorage.removeItem('selectedTrendingDomain');
+      }
+    }
+  }, [searchParams]);
+
+  // Fetch trending domains
+  useEffect(() => {
+    const fetchTrending = async () => {
+      try {
+        const trending = await aiTrendingService.getTrendingDomains(10);
+        setTrendingDomains(trending);
+      } catch (error) {
+        console.error('Failed to fetch trending domains:', error);
+      }
+    };
+
+    fetchTrending();
+  }, []);
 
   // Real-time price updates
   useEffect(() => {
@@ -302,7 +340,34 @@ export function DomainMarketplace({ initialDomains = [] }: MarketplaceProps) {
           </button>
         </div>
 
+        {/* Tab Navigation */}
+        <div className="flex gap-4 mb-6">
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`px-6 py-3 rounded-lg font-medium transition-all ${
+              activeTab === 'all'
+                ? 'bg-gradient-to-r from-[var(--primary)] to-[var(--secondary)] text-white'
+                : 'bg-gray-800/50 border border-gray-700 text-gray-300 hover:border-[var(--primary)]'
+            }`}
+          >
+            <Tag className="inline-block w-4 h-4 mr-2" />
+            All Domains
+          </button>
+          <button
+            onClick={() => setActiveTab('trending')}
+            className={`px-6 py-3 rounded-lg font-medium transition-all ${
+              activeTab === 'trending'
+                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
+                : 'bg-gray-800/50 border border-gray-700 text-gray-300 hover:border-purple-500'
+            }`}
+          >
+            <Sparkles className="inline-block w-4 h-4 mr-2" />
+            Trending Domains
+          </button>
+        </div>
+
         {/* Search and Filters */}
+        {activeTab === 'all' && (
         <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 mb-8 border border-gray-700">
           <div className="flex flex-col lg:flex-row gap-4">
             <div className="flex-1">
@@ -415,13 +480,81 @@ export function DomainMarketplace({ initialDomains = [] }: MarketplaceProps) {
             </div>
           </div>
         </div>
+        )}
 
         {/* Domain List */}
         {isLoading ? (
           <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
           </div>
+        ) : activeTab === 'trending' ? (
+          // Trending Domains Section
+          <AnimatePresence>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {trendingDomains.map((domain, index) => (
+                <motion.div
+                  key={index}
+                  layout
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700 hover:border-purple-500 transition-all cursor-pointer"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-400">#{index + 1}</span>
+                      <div className="w-16 h-1 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full"
+                           style={{ width: `${(domain.aiScore / 100) * 64}px` }} />
+                      <span className="text-xs text-purple-400">{domain.aiScore}</span>
+                    </div>
+                    <span className={`text-sm font-medium ${domain.change > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {domain.change > 0 ? '+' : ''}{domain.change}%
+                    </span>
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-2">
+                    {domain.name}.{domain.tld}
+                  </h3>
+                  <p className="text-2xl font-bold text-purple-400 mb-3">
+                    ${domain.price.toLocaleString()}
+                  </p>
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-xs text-gray-400">
+                      Vol: ${(domain.volume24h / 1000).toFixed(0)}k
+                    </span>
+                    <span className="text-xs px-2 py-1 bg-purple-500/20 text-purple-400 rounded">
+                      {domain.category}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-300 mb-4">
+                    {domain.reason}
+                  </p>
+                  <button
+                    onClick={() => {
+                      // Create a Domain object from TrendingDomain
+                      const domainForOffer: Domain = {
+                        tokenId: `trend-${index}`,
+                        name: domain.name,
+                        tld: domain.tld,
+                        owner: '0x0000000000000000000000000000000000000000' as any,
+                        valuation: BigInt(Math.floor(domain.price * 1e18)),
+                        confidence: domain.aiScore,
+                        isPremium: domain.aiScore > 85,
+                        expiryTime: BigInt(Date.now() + 365 * 24 * 60 * 60 * 1000),
+                        metadata: undefined,
+                      };
+                      setSelectedDomain(domainForOffer);
+                      setShowOfferModal(true);
+                    }}
+                    className="w-full py-2 bg-purple-600 hover:bg-purple-700 rounded text-white text-sm transition-colors"
+                  >
+                    Make Offer
+                  </button>
+                </motion.div>
+              ))}
+            </div>
+          </AnimatePresence>
         ) : (
+          // All Domains Section
           <AnimatePresence>
             <div className={viewMode === 'grid'
               ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'
